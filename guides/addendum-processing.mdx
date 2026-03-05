@@ -1,0 +1,469 @@
+---
+title: 'Addendum Processing'
+description: 'Learn how to process contract addendums for employee contract modifications'
+icon: 'file-signature'
+---
+
+## Overview
+
+Addendums (Adendas) are legal documents used to modify existing employment contracts without creating a new contract. Common uses include extending contract duration, changing salary, or updating work location.
+
+## What are Addendums?
+
+An addendum is a supplementary document that:
+
+<CardGroup cols={2}>
+  <Card title="Extends" icon="calendar-plus">
+    Contract duration or end date
+  </Card>
+  
+  <Card title="Modifies" icon="pen-to-square">
+    Terms like salary or position
+  </Card>
+  
+  <Card title="Updates" icon="arrows-rotate">
+    Work location or division
+  </Card>
+  
+  <Card title="Preserves" icon="shield-check">
+    Original contract integrity
+  </Card>
+</CardGroup>
+
+## When to Use Addendums
+
+<AccordionGroup>
+  <Accordion title="Contract Extension">
+    When an employee's contract period needs to be extended:
+    
+    **Original Contract:**
+    - Start: 01/01/2024
+    - End: 30/06/2024
+    
+    **Addendum:**
+    - New End Date: 31/12/2024
+    - Maintains all other terms
+  </Accordion>
+  
+  <Accordion title="Salary Adjustment">
+    When an employee receives a raise or salary modification:
+    
+    **Original Contract:**
+    - Salary: S/. 3,000
+    
+    **Addendum:**
+    - New Salary: S/. 3,500
+    - Effective from: 01/07/2024
+  </Accordion>
+  
+  <Accordion title="Position Change">
+    When an employee changes roles within the company:
+    
+    **Original Contract:**
+    - Position: Assistant
+    
+    **Addendum:**
+    - New Position: Analyst
+    - Maintains original contract dates
+  </Accordion>
+  
+  <Accordion title="Location Transfer">
+    When an employee transfers to a different division or location:
+    
+    **Original Contract:**
+    - Division: Main Office
+    
+    **Addendum:**
+    - New Division: Branch Office
+    - Updates address information
+  </Accordion>
+</AccordionGroup>
+
+## Addendum Excel Format
+
+### Required Column Headers
+
+Addendum Excel files use different headers than regular contracts:
+
+| Field | Accepted Headers | Format | Example |
+|-------|------------------|--------|----------|
+| Division | `DIVISION`, `división`, `area` | Text | Recursos Humanos |
+| Document Number | `Numero Documento`, `dni`, `NÚMERO DE DOCUMENTO` | 8 digits | 12345678 |
+| Worker Name | `TRABAJADOR`, `trabajador`, `nombres y apellidos` | Text | Juan Pérez García |
+| Entry Date | `fecha de ingreso`, `Fecha Ingreso` | DD/MM/YYYY | 01/01/2024 |
+| Original Start | `INICIO`, `inicio` | DD/MM/YYYY | 01/01/2024 |
+| Original End | `FECHA FIN`, `fecha fin`, `fin contrato` | DD/MM/YYYY | 30/06/2024 |
+| Salary | `salario`, `sueldo`, `SUELDO` | Number | 3500 |
+| Salary in Words | `salario en letras`, `Sueldo en Letras` | Text | tres mil quinientos soles |
+| Addendum Start | `INICIO ADENDA`, `inicio adenda` | DD/MM/YYYY | 01/07/2024 |
+| Addendum End | `FIN ADENDA`, `fin adenda` | DD/MM/YYYY | 31/12/2024 |
+
+### Location Fields
+
+Same as regular contracts:
+
+| Field | Headers | Example |
+|-------|---------|----------|
+| Address | `dirección`, `direccion`, `DOMICILIO` | Av. Principal 123 |
+| Province | `provincia`, `PROVINCIA` | Lima |
+| District | `distrito`, `DISTRITO` | Miraflores |
+| Department | `departamento`, `DEPARTAMENTO` | Lima |
+
+## Upload and Processing Workflow
+
+<Steps>
+  <Step title="Prepare Addendum Excel File">
+    Create an Excel file with addendum data using the required headers:
+    
+    ```
+    DIVISION | Numero Documento | TRABAJADOR | fecha de ingreso | INICIO | FECHA FIN | SUELDO | Sueldo en Letras | INICIO ADENDA | FIN ADENDA
+    ```
+  </Step>
+  
+  <Step title="Upload the File">
+    Send a POST request to the addendum upload endpoint:
+    
+    ```bash
+    curl -X POST http://localhost:3000/api/addendum/upload \
+      -F "excel=@addendums.xlsx" \
+      -H "Content-Type: multipart/form-data"
+    ```
+  </Step>
+  
+  <Step title="Receive Validation Results">
+    The API validates and returns processed addendum data:
+    
+    **Success Response:**
+    ```json
+    {
+      "success": true,
+      "message": "Adendas procesadas correctamente",
+      "data": {
+        "totalRecords": 5,
+        "validRecords": 5,
+        "invalidRecords": 0,
+        "employees": [
+          {
+            "division": "Recursos Humanos",
+            "documentNumber": "12345678",
+            "worker": "Juan Pérez García",
+            "entryDate": "01/01/2024",
+            "start": "01/01/2024",
+            "end": "30/06/2024",
+            "salary": 3500,
+            "salaryInWords": "tres mil quinientos soles",
+            "startAddendum": "01/07/2024",
+            "endAddendum": "31/12/2024"
+          }
+        ]
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Handle Validation Errors (if any)">
+    If there are validation errors, the response includes error details:
+    
+    ```json
+    {
+      "success": true,
+      "message": "Adendas procesadas con errores",
+      "data": {
+        "totalRecords": 10,
+        "validRecords": 7,
+        "invalidRecords": 3,
+        "employees": [ /* valid records */ ],
+        "errors": [
+          {
+            "row": 3,
+            "field": "documentNumber",
+            "message": "DNI debe tener exactamente 8 dígitos numéricos."
+          },
+          {
+            "row": 5,
+            "field": "salary",
+            "message": "El sueldo debe ser mayor a 0"
+          }
+        ]
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Processing Implementation
+
+The addendum service (`src/services/addendum.service.ts:9`) processes Excel files:
+
+```typescript
+export class AddendumServices {
+  async processExcelToAddendumData(buffer: Buffer) {
+    const validationResult = await this.excelParseServices.validateAddendumExcel(
+      buffer,
+      ADDENDUM_FIELDS_MAP,
+      {
+        sheetIndex: 0,
+        skipEmptyRows: true,
+        headerRow: 1,
+      },
+    );
+
+    return {
+      totalRecords: validationResult.totalRecords,
+      employees: validationResult.employeesAddendum,
+    };
+  }
+}
+```
+
+## Validation Rules
+
+Addendum data is validated with specific rules:
+
+<CodeGroup>
+```typescript Document Number
+documentNumber: z.string()
+  .regex(/^\d{8}$/, 'DNI debe tener exactamente 8 dígitos numéricos')
+```
+
+```typescript Worker Name
+worker: z.string()
+  .min(5, 'Nombre completo debe tener al menos 5 caracteres')
+  .max(150, 'Nombre completo no puede exceder 150 caracteres')
+```
+
+```typescript Salary
+salary: z.number()
+  .refine((value) => value > 0, {
+    message: 'El sueldo debe ser mayor a 0',
+  })
+```
+
+```typescript Dates
+startAddendum: z.union([
+  z.string().regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Fecha debe estar en formato DD/MM/YYYY'),
+  z.date(),
+])
+endAddendum: z.union([
+  z.string().regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Fecha debe estar en formato DD/MM/YYYY'),
+  z.date(),
+])
+```
+</CodeGroup>
+
+## Validation Response Structure
+
+The validation result includes statistics and detailed error information:
+
+```typescript
+export interface ValidateAddendumResult {
+  employeesAddendum: EmployeeAddendum[];
+  errors: ValidationError[];
+  totalRecords: number;
+  validRecords: number;
+  invalidRecords: number;
+}
+```
+
+Implementation in `src/services/excel-parser.service.ts:314`:
+
+```typescript
+const invalidRows = new Set(validation.errors.map((e) => e.row));
+const invalidRecords = invalidRows.size;
+const validRecords = validation.validEmployeesAddendum?.length || 0;
+
+const result: ValidateAddendumResult = {
+  employeesAddendum: validation.validEmployeesAddendum || [],
+  errors: validation.errors,
+  totalRecords,
+  validRecords,
+  invalidRecords,
+};
+```
+
+## Example Excel Template
+
+### Addendum Template
+
+| DIVISION | Numero Documento | TRABAJADOR | fecha de ingreso | INICIO | FECHA FIN | dirección | provincia | distrito | departamento | SUELDO | Sueldo en Letras | INICIO ADENDA | FIN ADENDA |
+|----------|------------------|------------|------------------|--------|-----------|-----------|-----------|----------|--------------|--------|------------------|---------------|------------|
+| Recursos Humanos | 12345678 | Juan Pérez García | 01/01/2024 | 01/01/2024 | 30/06/2024 | Av. Principal 123 | Lima | Miraflores | Lima | 3500 | tres mil quinientos soles | 01/07/2024 | 31/12/2024 |
+| Operaciones | 87654321 | María López Ruiz | 15/02/2024 | 15/02/2024 | 31/08/2024 | Jr. Los Olivos 456 | Lima | San Isidro | Lima | 2800 | dos mil ochocientos soles | 01/09/2024 | 28/02/2025 |
+
+<Note>
+  All date fields must use DD/MM/YYYY format for consistency.
+</Note>
+
+## Complete Example
+
+### Upload Addendum File
+
+```bash
+curl -X POST http://localhost:3000/api/addendum/upload \
+  -F "excel=@addendums.xlsx" \
+  -H "Content-Type: multipart/form-data" \
+  | jq '.'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Adendas procesadas correctamente",
+  "data": {
+    "totalRecords": 2,
+    "validRecords": 2,
+    "invalidRecords": 0,
+    "employees": [
+      {
+        "division": "Recursos Humanos",
+        "documentNumber": "12345678",
+        "worker": "Juan Pérez García",
+        "entryDate": "01/01/2024",
+        "start": "01/01/2024",
+        "end": "30/06/2024",
+        "address": "Av. Principal 123",
+        "province": "Lima",
+        "district": "Miraflores",
+        "department": "Lima",
+        "salary": 3500,
+        "salaryInWords": "tres mil quinientos soles",
+        "startAddendum": "01/07/2024",
+        "endAddendum": "31/12/2024"
+      },
+      {
+        "division": "Operaciones",
+        "documentNumber": "87654321",
+        "worker": "María López Ruiz",
+        "entryDate": "15/02/2024",
+        "start": "15/02/2024",
+        "end": "31/08/2024",
+        "address": "Jr. Los Olivos 456",
+        "province": "Lima",
+        "district": "San Isidro",
+        "department": "Lima",
+        "salary": 2800,
+        "salaryInWords": "dos mil ochocientos soles",
+        "startAddendum": "01/09/2024",
+        "endAddendum": "28/02/2025"
+      }
+    ]
+  }
+}
+```
+
+## Error Handling
+
+### Common Validation Errors
+
+<AccordionGroup>
+  <Accordion title="Invalid Document Number">
+    **Error:** `DNI debe tener exactamente 8 dígitos numéricos`
+    
+    **Cause:** Document number is not exactly 8 digits
+    
+    **Solution:**
+    - Ensure DNI has exactly 8 digits
+    - Remove any dashes or spaces
+    - Don't use leading zeros unless part of actual DNI
+  </Accordion>
+  
+  <Accordion title="Invalid Date Format">
+    **Error:** `Fecha debe estar en formato DD/MM/YYYY`
+    
+    **Cause:** Date is not in the expected format
+    
+    **Solution:**
+    - Use DD/MM/YYYY format (e.g., 01/07/2024)
+    - Or use Excel date cells (will be auto-converted)
+    - Ensure dates are logical (start before end)
+  </Accordion>
+  
+  <Accordion title="Invalid Salary">
+    **Error:** `El sueldo debe ser mayor a 0`
+    
+    **Cause:** Salary is zero, negative, or invalid
+    
+    **Solution:**
+    - Enter positive numeric value
+    - Remove currency symbols if using numeric field
+    - Or use text format like "S/. 3500"
+  </Accordion>
+  
+  <Accordion title="Missing Required Field">
+    **Error:** `Campo requerido no puede estar vacío`
+    
+    **Cause:** A required field is empty
+    
+    **Solution:**
+    - Fill all required columns
+    - Check for hidden empty cells
+    - Verify data doesn't have trailing spaces
+  </Accordion>
+</AccordionGroup>
+
+## Differences from Regular Contracts
+
+<Warning>
+  Addendums have different field requirements than regular contracts.
+</Warning>
+
+| Aspect | Regular Contract | Addendum |
+|--------|------------------|----------|
+| Field Map | `CONTRACT_FIELDS_MAP` | `ADDENDUM_FIELDS_MAP` |
+| Worker Name | Split into 3 fields (name, lastNameFather, lastNameMother) | Single field (worker) |
+| Date Fields | entryDate, endDate | start, end, startAddendum, endAddendum |
+| Division | subDivisionOrParking | division |
+| Validation Endpoint | `/api/excel/upload` | `/api/addendum/upload` |
+
+Source code reference: `src/constants/contract-field.ts:324`
+
+```typescript
+export const ADDENDUM_FIELDS_MAP: Record<string, FieldConfig> = {
+  ...ADDENDUM_FIELDS,
+  ...LOCATION_FIELDS,
+};
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Data Preparation" icon="clipboard-list">
+    - Verify original contract dates
+    - Ensure new dates extend existing contract
+    - Double-check employee DNI numbers
+    - Use consistent date formats
+  </Card>
+  
+  <Card title="Validation" icon="check-double">
+    - Review all validation errors
+    - Test with small batch first
+    - Keep backup of original data
+    - Document changes made
+  </Card>
+  
+  <Card title="Date Logic" icon="calendar-check">
+    - startAddendum should be after or equal to original end
+    - endAddendum should be after startAddendum
+    - Original dates should match employee records
+    - Consider holiday and weekend dates
+  </Card>
+  
+  <Card title="Salary Updates" icon="dollar-sign">
+    - Verify salary increase amounts
+    - Write salary in words correctly
+    - Check currency formatting
+    - Document approval for changes
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Excel Upload Guide" icon="file-excel" href="/guides/excel-upload">
+    Learn more about Excel file requirements
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Understand error responses and debugging
+  </Card>
+</CardGroup>

@@ -1,0 +1,305 @@
+---
+title: 'Download Contracts ZIP'
+api: 'POST /api/contracts/download-zip'
+description: 'Generate and download multiple employee contracts as a ZIP file'
+---
+
+## Overview
+
+This endpoint generates contracts for multiple employees and returns them as a ZIP file. For each employee, the ZIP contains:
+- The employment contract PDF
+- A personal data processing agreement PDF
+- Contract annexes PDF
+
+Files are organized in folders by contract type (e.g., `planilla/`, `parttime/`, `subsidio/`).
+
+## Request
+
+### Body Parameters
+
+The request body must be an array of employee objects (minimum 1, maximum 50 employees per batch).
+
+<ParamField body="employees" type="array" required>
+  Array of employee objects to generate contracts for
+  
+  <Expandable title="Employee Object Properties">
+    <ParamField body="name" type="string" required>
+      Employee's first name (2-50 characters, letters only)
+    </ParamField>
+    
+    <ParamField body="lastNameFather" type="string" required>
+      Paternal last name (2-50 characters, letters only)
+    </ParamField>
+    
+    <ParamField body="lastNameMother" type="string" required>
+      Maternal last name (2-50 characters, letters only)
+    </ParamField>
+    
+    <ParamField body="birthDate" type="string" required>
+      Date of birth in format `DD/MM/YYYY`
+    </ParamField>
+    
+    <ParamField body="sex" type="string" required>
+      Gender of the employee
+    </ParamField>
+    
+    <ParamField body="dni" type="string" required>
+      National ID number - exactly 8 numeric digits
+    </ParamField>
+    
+    <ParamField body="email" type="string" required>
+      Valid email address
+    </ParamField>
+    
+    <ParamField body="address" type="string" required>
+      Street address (max 200 characters)
+    </ParamField>
+    
+    <ParamField body="province" type="string" required>
+      Province name (minimum 2 characters)
+    </ParamField>
+    
+    <ParamField body="district" type="string" required>
+      District name (minimum 2 characters)
+    </ParamField>
+    
+    <ParamField body="department" type="string" required>
+      Department name (minimum 2 characters)
+    </ParamField>
+    
+    <ParamField body="salary" type="number" required>
+      Salary amount (must be greater than 0)
+    </ParamField>
+    
+    <ParamField body="salaryInWords" type="string" required>
+      Salary written in words (5-100 characters)
+    </ParamField>
+    
+    <ParamField body="position" type="string" required>
+      Job position/title
+    </ParamField>
+    
+    <ParamField body="entryDate" type="string" required>
+      Employment start date in format `DD/MM/YYYY`
+    </ParamField>
+    
+    <ParamField body="endDate" type="string" required>
+      Contract end date in format `DD/MM/YYYY`
+    </ParamField>
+    
+    <ParamField body="subDivisionOrParking" type="string" required>
+      Subdivision or parking assignment
+    </ParamField>
+    
+    <ParamField body="contractType" type="string" required>
+      Type of contract. Must be one of: `Planilla`, `Part Time`, `Subsidio`
+    </ParamField>
+    
+    <ParamField body="replacementFor" type="string">
+      **Required for Subsidio contracts only.** Name of the person being replaced
+    </ParamField>
+    
+    <ParamField body="reasonForSubstitution" type="string">
+      **Required for Subsidio contracts only.** Reason for the substitution
+    </ParamField>
+    
+    <ParamField body="timeForCompany" type="string">
+      **Required for Subsidio contracts only.** Duration of employment with company
+    </ParamField>
+    
+    <ParamField body="workingCondition" type="string">
+      **Required for Subsidio contracts only.** Working conditions description
+    </ParamField>
+    
+    <ParamField body="probationaryPeriod" type="string">
+      **Required for Subsidio contracts only.** Probationary period duration
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+### Success Response
+
+<ResponseField name="Content-Type" type="string">
+  `application/zip`
+</ResponseField>
+
+<ResponseField name="Content-Disposition" type="string">
+  `attachment; filename="contratos-DD-MM-YYYY.zip"`
+  
+  The filename includes the current date when the ZIP was generated.
+</ResponseField>
+
+<ResponseField name="Body" type="binary">
+  ZIP file containing all generated contracts
+</ResponseField>
+
+### ZIP File Structure
+
+The ZIP file is organized as follows:
+
+```
+contratos-05-03-2026.zip
+├── planilla/
+│   ├── {dni}-{position}.pdf              (Main contract)
+│   ├── Tratamiento de datos/
+│   │   └── {dni}.pdf                     (Data processing agreement)
+│   └── Anexos/
+│       └── {dni}.pdf                     (Contract annexes)
+├── parttime/
+│   └── (same structure)
+└── subsidio/
+    └── (same structure)
+```
+
+### Error Responses
+
+<ResponseField name="400 - Validation Error">
+  ```json
+  {
+    "success": false,
+    "message": "La solicitud no se pudo procesar",
+    "errors": [
+      {
+        "field": "body.0.dni",
+        "message": "DNI debe tener exactamente 8 dígitos numéricos."
+      },
+      {
+        "field": "body.1.contractType",
+        "message": "El tipo de contrato debe ser: Planilla, Subsidio, Part Time"
+      }
+    ]
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="400 - Empty Array">
+  ```json
+  {
+    "success": false,
+    "message": "La solicitud no se pudo procesar",
+    "errors": [
+      {
+        "field": "body",
+        "message": "Debes seleccionar al menos un empleado para generar el ZIP."
+      }
+    ]
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="400 - Too Many Employees">
+  ```json
+  {
+    "success": false,
+    "message": "La solicitud no se pudo procesar",
+    "errors": [
+      {
+        "field": "body",
+        "message": "Máximo 80 empleados por lote"
+      }
+    ]
+  }
+  ```
+</ResponseField>
+
+## Examples
+
+### Basic Example (Planilla Contract)
+
+```bash
+curl -X POST https://api.example.com/api/contracts/download-zip \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "name": "Juan",
+      "lastNameFather": "García",
+      "lastNameMother": "López",
+      "birthDate": "15/06/1990",
+      "sex": "Masculino",
+      "dni": "12345678",
+      "email": "juan.garcia@example.com",
+      "address": "Av. Principal 123",
+      "province": "Lima",
+      "district": "Miraflores",
+      "department": "Lima",
+      "salary": 3500,
+      "salaryInWords": "tres mil quinientos soles",
+      "position": "Desarrollador",
+      "entryDate": "01/03/2026",
+      "endDate": "31/12/2026",
+      "subDivisionOrParking": "Tecnología",
+      "contractType": "Planilla"
+    }
+  ]' \
+  --output contratos.zip
+```
+
+### Multiple Employees with Different Contract Types
+
+```bash
+curl -X POST https://api.example.com/api/contracts/download-zip \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "name": "María",
+      "lastNameFather": "Pérez",
+      "lastNameMother": "Silva",
+      "birthDate": "20/03/1992",
+      "sex": "Femenino",
+      "dni": "87654321",
+      "email": "maria.perez@example.com",
+      "address": "Calle Los Olivos 456",
+      "province": "Lima",
+      "district": "San Isidro",
+      "department": "Lima",
+      "salary": 2500,
+      "salaryInWords": "dos mil quinientos soles",
+      "position": "Asistente",
+      "entryDate": "15/03/2026",
+      "endDate": "15/09/2026",
+      "subDivisionOrParking": "Administración",
+      "contractType": "Part Time"
+    },
+    {
+      "name": "Carlos",
+      "lastNameFather": "Rodríguez",
+      "lastNameMother": "Torres",
+      "birthDate": "10/08/1988",
+      "sex": "Masculino",
+      "dni": "45678912",
+      "email": "carlos.rodriguez@example.com",
+      "address": "Jr. Las Flores 789",
+      "province": "Lima",
+      "district": "Surco",
+      "department": "Lima",
+      "salary": 4000,
+      "salaryInWords": "cuatro mil soles",
+      "position": "Analista Senior",
+      "entryDate": "01/04/2026",
+      "endDate": "30/06/2026",
+      "subDivisionOrParking": "Finanzas",
+      "contractType": "Subsidio",
+      "replacementFor": "Ana Martínez",
+      "reasonForSubstitution": "Licencia por maternidad",
+      "timeForCompany": "3 meses",
+      "workingCondition": "Tiempo completo",
+      "probationaryPeriod": "30 días"
+    }
+  ]' \
+  --output contratos.zip
+```
+
+## Implementation Notes
+
+- The ZIP file is streamed directly to the response using Archiver with maximum compression (level 9)
+- Each employee's documents are generated in parallel using Puppeteer
+- If an individual employee's contract generation fails, the error is logged but the process continues for other employees
+- The filename uses the current date in `DD-MM-YYYY` format
+- Folder names in the ZIP are lowercase and spaces are removed from contract types
+- File paths follow the pattern: `{contractType}/{filename}` for contracts and `{contractType}/Tratamiento de datos/{dni}.pdf` for data processing documents
+
+## Related Endpoints
+
+- [Preview Contract](/api/contracts/preview) - Preview a single employee contract before generating a batch

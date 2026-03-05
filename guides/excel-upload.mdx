@@ -1,0 +1,447 @@
+---
+title: 'Excel Upload'
+description: 'Learn how to prepare and upload Excel files for bulk contract generation'
+icon: 'file-excel'
+---
+
+## Overview
+
+Kontrak Backend accepts Excel files (.xlsx) containing employee data for bulk processing. The system validates headers, data types, and required fields before processing.
+
+## Excel File Requirements
+
+<CardGroup cols={2}>
+  <Card title="File Format" icon="file">
+    - Format: `.xlsx` (Excel 2007+)
+    - Max size: 10MB (configurable)
+    - Single or multiple sheets
+    - UTF-8 encoding supported
+  </Card>
+  
+  <Card title="Data Structure" icon="table">
+    - Headers in row 1
+    - Data starts from row 2
+    - No merged cells in data area
+    - Consistent data types per column
+  </Card>
+</CardGroup>
+
+## Required Column Headers
+
+### For Regular Contracts (PLANILLA, PART TIME)
+
+The system recognizes multiple aliases for each field. Use any of the following:
+
+<AccordionGroup>
+  <Accordion title="Basic Information">
+    | Field | Accepted Headers | Format | Example |
+    |-------|------------------|--------|----------|
+    | Name | `nombre`, `name`, `NOMBRE COMPLETO` | Text | Juan |
+    | Father's Last Name | `apellido paterno`, `APELLIDO PATERNO` | Text | Pérez |
+    | Mother's Last Name | `apellido materno`, `APELLIDO MATERNO` | Text | García |
+    | DNI | `dni`, `DNI`, `Documento de identidad` | 8 digits | 12345678 |
+    | Email | `email`, `Email`, `correo` | Email | juan@example.com |
+    | Birth Date | `Fecha Nac.`, `fecha de nacimiento` | DD/MM/YYYY | 15/03/1990 |
+    | Sex | `GENERO`, `genero`, `sexo` | M/F | M |
+  </Accordion>
+  
+  <Accordion title="Address Information">
+    | Field | Accepted Headers | Format | Example |
+    |-------|------------------|--------|----------|
+    | Address | `dirección`, `direccion`, `DOMICILIO` | Text | Av. Principal 123 |
+    | Province | `provincia`, `PROVINCIA` | Text | Lima |
+    | District | `distrito`, `DISTRITO` | Text | Miraflores |
+    | Department | `departamento`, `DEPARTAMENTO` | Text | Lima |
+  </Accordion>
+  
+  <Accordion title="Employment Information">
+    | Field | Accepted Headers | Format | Example |
+    |-------|------------------|--------|----------|
+    | Position | `Cargo`, `CARGO`, `POSICION` | Text | Analista |
+    | Salary | `salario`, `sueldo`, `SUELDO` | Number | 3000 |
+    | Salary in Words | `salario en letras`, `sueldo en letras` | Text | tres mil soles |
+    | Entry Date | `INICIO`, `fecha de ingreso` | DD/MM/YYYY | 01/01/2024 |
+    | End Date | `FIN`, `FECHA DE TERMINO`, `Fecha Fin` | DD/MM/YYYY | 31/12/2024 |
+    | Subdivision | `playa`, `PLAYA`, `ESTACIONAMIENTO` | Text | Sede Central |
+    | Contract Type | `tipo de contrato`, `TIPO DE CONTRATO` | Text | Planilla |
+  </Accordion>
+</AccordionGroup>
+
+### For SUBSIDIO Contracts
+
+<Warning>
+  SUBSIDIO contracts require additional columns beyond the basic fields.
+</Warning>
+
+| Field | Accepted Headers | Format | Example |
+|-------|------------------|--------|----------|
+| Replacement For | `Suplencia de:`, `SUPLENCIA DE`, `Reemplazo:` | Text | Carlos Mendoza |
+| Reason for Substitution | `Motivo de Suplencia`, `MOTIVO DE SUPLENCIA` | Text | Vacaciones |
+| Time For Company | `tiempo en empresa`, `Tiempo en Empresa` | Text | 6 meses |
+| Working Condition | `CONDICION LABORAL`, `condición laboral` | Text | Temporal |
+| Probationary Period | `PERIODO DE PRUEBA`, `Periodo de prueba` | Text | 3 meses |
+
+## Upload Process
+
+<Steps>
+  <Step title="Prepare your Excel file">
+    Ensure your Excel file has the correct headers and data format.
+  </Step>
+  
+  <Step title="Upload the file">
+    Send a POST request to `/api/excel/upload` with the Excel file:
+    
+    ```bash
+    curl -X POST http://localhost:3000/api/excel/upload \
+      -F "excel=@employees.xlsx" \
+      -H "Content-Type: multipart/form-data"
+    ```
+  </Step>
+  
+  <Step title="Receive validation results">
+    The API responds with validated employee data or validation errors:
+    
+    **Success Response:**
+    ```json
+    {
+      "success": true,
+      "message": "Excel procesado correctamente",
+      "data": {
+        "employees": [
+          {
+            "name": "Juan",
+            "lastNameFather": "Pérez",
+            "lastNameMother": "García",
+            "dni": "12345678",
+            // ... other fields
+          }
+        ],
+        "totalRecords": 10
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Data Type Handling
+
+The Excel parser automatically handles various data formats:
+
+### Date Fields
+
+<Tabs>
+  <Tab title="Excel Date Format">
+    Excel native date cells are automatically converted:
+    
+    ```typescript
+    // Excel date object → DD/MM/YYYY string
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const year = value.getUTCFullYear();
+    finalValue = `${day}/${month}/${year}`;
+    ```
+    
+    **Supported Date Fields:**
+    - `entryDate`
+    - `endDate`
+    - `birthDate`
+  </Tab>
+  
+  <Tab title="Text Date Format">
+    You can also use text in DD/MM/YYYY format:
+    
+    ```
+    01/01/2024
+    15/03/1990
+    31/12/2024
+    ```
+  </Tab>
+</Tabs>
+
+### Numeric Fields
+
+<Tabs>
+  <Tab title="DNI">
+    DNI can be entered as number or text, but must be 8 digits:
+    
+    ```typescript
+    // Number → String conversion
+    if (field === 'dni' && typeof value === 'number') {
+      finalValue = String(value);
+    }
+    ```
+    
+    ✅ Valid: `12345678`, `87654321`  
+    ❌ Invalid: `1234567`, `123456789`, `12-345-678`
+  </Tab>
+  
+  <Tab title="Salary">
+    Salary can be entered with or without currency symbols:
+    
+    ```typescript
+    // Supports: 3000, "3000", "S/. 3000", "S/.3,000.50"
+    let cleanValue = trimmed.replace(/^S\/.?\s*/i, '').trim();
+    cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
+    const num = Number(cleanValue);
+    ```
+    
+    ✅ Valid: `3000`, `3,000`, `S/. 3000`  
+    ❌ Invalid: `N/A`, `TBD`, empty
+  </Tab>
+</Tabs>
+
+### Text Fields
+
+Text fields are automatically trimmed and validated:
+
+```typescript
+if (typeof value === 'string') {
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+```
+
+## Header Validation
+
+The system performs strict header validation before processing data.
+
+### Validation Process
+
+<Steps>
+  <Step title="Extract headers">
+    Headers are read from the first row (configurable) and normalized:
+    
+    ```typescript
+    function normalizeHeader(header: string): string {
+      return header
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '')  // Remove spaces
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, ''); // Remove accents
+    }
+    ```
+  </Step>
+  
+  <Step title="Map to fields">
+    Each header is matched against known aliases:
+    
+    ```typescript
+    for (const [field, config] of Object.entries(fields)) {
+      const commonAlias = config.aliases.some(
+        (alias) => normalizeHeader(alias) === normalized,
+      );
+      if (commonAlias) {
+        return field;
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Check required fields">
+    All required fields must be present:
+    
+    ```typescript
+    const missingHeaders: string[] = [];
+    requiredField.forEach(([field, config]) => {
+      if (!foundFields.has(field)) {
+        const commonName = config.aliases[0];
+        missingHeaders.push(commonName);
+      }
+    });
+    ```
+  </Step>
+</Steps>
+
+## Validation Errors
+
+### Missing Headers Error
+
+If required headers are missing:
+
+```json
+{
+  "success": false,
+  "message": "La estructura del archivo es incorrecta. Faltan columnas obligatorias.",
+  "data": {
+    "validationErrors": [
+      {
+        "row": 1,
+        "field": "dni",
+        "message": "Encabezado requerido no encontrado en el archivo."
+      },
+      {
+        "row": 1,
+        "field": "salario",
+        "message": "Encabezado requerido no encontrado en el archivo."
+      }
+    ]
+  }
+}
+```
+
+### Data Validation Errors
+
+If data doesn't meet validation rules:
+
+```json
+{
+  "success": false,
+  "message": "No se pudo procesar el archivo. Se encontraron 3 errores.",
+  "data": {
+    "validationErrors": [
+      {
+        "row": 2,
+        "field": "dni",
+        "message": "DNI debe tener exactamente 8 dígitos numéricos."
+      },
+      {
+        "row": 3,
+        "field": "email",
+        "message": "Invalid email"
+      },
+      {
+        "row": 5,
+        "field": "salary",
+        "message": "El sueldo debe ser mayor a 0"
+      }
+    ]
+  }
+}
+```
+
+## Advanced Options
+
+The Excel parser supports additional configuration:
+
+```typescript
+export interface ImportOptions {
+  sheetIndex?: number;      // Índice de la hoja (0, 1, 2...)
+  sheetName?: string;       // Nombre de la hoja
+  skipEmptyRows?: boolean;  // Saltar filas vacías (default: true)
+  skipEmptyCells?: boolean; // Saltar celdas vacías
+  headerRow?: number;       // Número de fila donde están los encabezados (default: 1)
+}
+```
+
+### Processing Specific Sheets
+
+```typescript
+// By sheet name
+const options = {
+  sheetName: 'Employees',
+  headerRow: 1,
+  skipEmptyRows: true
+};
+
+// By sheet index
+const options = {
+  sheetIndex: 0,  // First sheet
+  headerRow: 1,
+  skipEmptyRows: true
+};
+```
+
+## Example Excel Template
+
+### PLANILLA Template
+
+| nombre | apellido paterno | apellido materno | dni | email | Fecha Nac. | genero | dirección | provincia | distrito | departamento | sueldo | sueldo en letras | Cargo | INICIO | FIN | playa | tipo de contrato |
+|--------|------------------|------------------|-----|-------|------------|--------|-----------|-----------|----------|--------------|--------|------------------|-------|--------|-----|-------|------------------|
+| Juan | Pérez | García | 12345678 | juan@example.com | 15/03/1990 | M | Av. Principal 123 | Lima | Miraflores | Lima | 3000 | tres mil soles | Analista | 01/01/2024 | 31/12/2024 | Sede Central | Planilla |
+
+### SUBSIDIO Template
+
+| nombre | apellido paterno | apellido materno | dni | email | Fecha Nac. | genero | dirección | provincia | distrito | departamento | sueldo | sueldo en letras | Cargo | INICIO | FIN | playa | tipo de contrato | Suplencia de: | Motivo de Suplencia | tiempo en empresa | CONDICION LABORAL | PERIODO DE PRUEBA |
+|--------|------------------|------------------|-----|-------|------------|--------|-----------|-----------|----------|--------------|--------|------------------|-------|--------|-----|-------|------------------|---------------|---------------------|-------------------|-------------------|-------------------|
+| María | López | Ruiz | 87654321 | maria@example.com | 20/07/1988 | F | Jr. Los Olivos 456 | Lima | San Isidro | Lima | 2500 | dos mil quinientos soles | Asistente | 15/02/2024 | 31/08/2024 | Oficina Principal | Subsidio | Carlos Mendoza | Vacaciones | 6 meses | Temporal | 3 meses |
+
+<Note>
+  Download the Excel templates from the examples above to ensure proper formatting.
+</Note>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="File too large">
+    **Error:** `El archivo es demasiado grande. Tamaño máximo: 10 MB`
+    
+    **Solution:**
+    - Reduce file size by removing unnecessary formatting
+    - Split data into multiple files
+    - Increase `MAX_FILE_SIZE` in configuration
+  </Accordion>
+  
+  <Accordion title="Corrupt file error">
+    **Error:** `El archivo Excel está corrupto o no es un archivo válido`
+    
+    **Solution:**
+    - Save file as `.xlsx` format (not `.xls`)
+    - Remove macros and VBA code
+    - Open and re-save in Excel
+  </Accordion>
+  
+  <Accordion title="Empty file error">
+    **Error:** `El archivo Excel no contiene datos válidos`
+    
+    **Solution:**
+    - Ensure data starts from row 2 (after headers)
+    - Check for hidden rows/columns
+    - Verify sheet is not empty
+  </Accordion>
+  
+  <Accordion title="Header not found">
+    **Error:** `Encabezado requerido no encontrado en el archivo`
+    
+    **Solution:**
+    - Check spelling of column headers
+    - Use one of the accepted aliases
+    - Remove extra spaces in headers
+    - Ensure headers are in row 1
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="File Preparation" icon="clipboard-check">
+    - Use the latest Excel format (.xlsx)
+    - Keep formatting simple
+    - Avoid merged cells
+    - Use consistent date formats
+    - Remove empty rows between data
+  </Card>
+  
+  <Card title="Data Entry" icon="keyboard">
+    - Use standard date format (DD/MM/YYYY)
+    - Enter DNI without dashes or spaces
+    - Use numeric format for salary
+    - Verify email addresses
+    - Double-check contract types
+  </Card>
+  
+  <Card title="Validation" icon="check-circle">
+    - Test with small file first
+    - Review validation errors carefully
+    - Fix errors row by row
+    - Keep backup of original file
+  </Card>
+  
+  <Card title="Performance" icon="gauge-high">
+    - Keep files under 5MB when possible
+    - Limit to 1000 employees per file
+    - Remove unnecessary columns
+    - Use single sheet when possible
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Generating Contracts" icon="file-contract" href="/guides/generating-contracts">
+    Generate contracts from uploaded data
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Learn how to handle validation errors
+  </Card>
+</CardGroup>

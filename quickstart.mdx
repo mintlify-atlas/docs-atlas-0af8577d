@@ -1,80 +1,378 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get started with Kontrak Backend in 5 minutes - from installation to generating your first contract
 ---
 
-## Get started in three steps
+## Generate Your First Contract
 
-Get your documentation site running locally and make your first customization.
+This guide will take you from zero to generating your first employment contract in under 10 minutes.
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Prerequisites Check">
+    Before starting, ensure you have the following installed:
+    
+    - **Node.js**: Version 18.0.0 or higher
+    - **npm**: Version 8.0.0 or higher (comes with Node.js)
+    - **Git**: For cloning the repository
+    
+    Verify your installations:
+    
+    ```bash
+    node --version  # Should show v18.0.0 or higher
+    npm --version   # Should show 8.0.0 or higher
+    ```
+  </Step>
+
+  <Step title="Clone and Install">
+    Clone the repository and install dependencies:
+    
+    ```bash
+    # Clone the repository
+    git clone <your-repository-url>
+    cd kontrak-backend
+    
+    # Install dependencies
+    npm install
+    ```
+    
+    This will install all required packages including Express, TypeScript, Puppeteer, and Zod.
+  </Step>
+
+  <Step title="Environment Setup">
+    Create a `.env` file in the project root with the following configuration:
+    
+    ```bash .env
+    # Server Configuration
+    NODE_ENV=development
+    PORT=3000
+    HOST=localhost
+    
+    # CORS - Allowed origins (comma-separated)
+    CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    
+    # File Limits
+    MAX_FILE_SIZE=10485760  # 10MB
+    MAX_EMPLOYEES=1000
+    
+    # Temporary directory for file processing
+    TEMP_DIR=./temp
+    ```
+    
+    <Tip>
+      You can copy the example file: `cp .env.example .env`
+    </Tip>
+  </Step>
+
+  <Step title="Start the Development Server">
+    Start the server in development mode:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    You should see output similar to:
+    
+    ```
+    [INFO] Creando aplicacion Express...
+    [INFO] Inicializando servidor...
+    [INFO] =========== Server running on port 3000 ==========
+    [INFO] =========== Environment: development ==========
+    ```
+    
+    <Note>
+      The server uses `nodemon` and `ts-node` in development mode, which automatically restarts on file changes.
+    </Note>
+  </Step>
+
+  <Step title="Verify Installation">
+    Test that the API is running by hitting the health check endpoint:
+    
+    ```bash
+    curl http://localhost:3000/
+    ```
+    
+    Expected response:
+    
+    ```json
+    {
+      "success": true,
+      "message": "Kontrak API - Sistema de Generación de Contratos",
+      "version": "1.0.0",
+      "status": "running",
+      "timestamp": "2026-03-05T10:30:00.000Z",
+      "endpoints": {
+        "uploadExcel": "POST /api/contracts/upload",
+        "health": "GET /api/health"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Generate Your First Contract">
+    Now let's generate a sample employment contract. Create a file called `test-employee.json`:
+    
+    ```json test-employee.json
+    {
+      "name": "Juan",
+      "lastNameFather": "Pérez",
+      "lastNameMother": "García",
+      "dni": "12345678",
+      "email": "juan.perez@example.com",
+      "birthDate": "15/05/1990",
+      "sex": "M",
+      "province": "Lima",
+      "district": "Miraflores",
+      "department": "Lima",
+      "address": "Av. Larco 1234",
+      "salary": 3000,
+      "salaryInWords": "Tres mil con 00/100 soles",
+      "position": "Desarrollador Senior",
+      "entryDate": "01/04/2026",
+      "endDate": "31/12/2026",
+      "subDivisionOrParking": "Tecnología",
+      "contractType": "PLANILLA"
+    }
+    ```
+    
+    Generate and preview the contract:
+    
+    ```bash
+    curl -X POST http://localhost:3000/api/contracts/preview \
+      -H "Content-Type: application/json" \
+      -d @test-employee.json \
+      --output contract-preview.pdf
+    ```
+    
+    <Success>
+      Open `contract-preview.pdf` to see your generated employment contract!
+    </Success>
+  </Step>
+
+  <Step title="Generate Bulk Contracts">
+    To generate multiple contracts at once, use the batch endpoint with an array of employees:
+    
+    ```json bulk-employees.json
+    [
+      {
+        "name": "Juan",
+        "lastNameFather": "Pérez",
+        "lastNameMother": "García",
+        "dni": "12345678",
+        "email": "juan.perez@example.com",
+        "birthDate": "15/05/1990",
+        "sex": "M",
+        "province": "Lima",
+        "district": "Miraflores",
+        "department": "Lima",
+        "address": "Av. Larco 1234",
+        "salary": 3000,
+        "salaryInWords": "Tres mil con 00/100 soles",
+        "position": "Desarrollador Senior",
+        "entryDate": "01/04/2026",
+        "endDate": "31/12/2026",
+        "subDivisionOrParking": "Tecnología",
+        "contractType": "PLANILLA"
+      },
+      {
+        "name": "María",
+        "lastNameFather": "López",
+        "lastNameMother": "Torres",
+        "dni": "87654321",
+        "email": "maria.lopez@example.com",
+        "birthDate": "20/08/1992",
+        "sex": "F",
+        "province": "Lima",
+        "district": "San Isidro",
+        "department": "Lima",
+        "address": "Calle Las Flores 567",
+        "salary": 2000,
+        "salaryInWords": "Dos mil con 00/100 soles",
+        "position": "Diseñadora",
+        "entryDate": "01/04/2026",
+        "endDate": "31/12/2026",
+        "subDivisionOrParking": "Diseño",
+        "contractType": "PART TIME"
+      }
+    ]
+    ```
+    
+    Download all contracts as a ZIP:
+    
+    ```bash
+    curl -X POST http://localhost:3000/api/contracts/download-zip \
+      -H "Content-Type: application/json" \
+      -d @bulk-employees.json \
+      --output contracts.zip
+    ```
+    
+    <Info>
+      The ZIP file will contain organized folders for each contract type with all associated documents (contract, data processing agreement, and annexes).
+    </Info>
+  </Step>
+</Steps>
+
+## Understanding Contract Types
+
+Kontrak Backend supports three contract types, each with specific requirements:
+
+<Tabs>
+  <Tab title="PLANILLA (Standard)">
+    Standard full-time employment contracts.
+    
+    **Minimum Required Fields:**
+    ```typescript
+    {
+      name: string,
+      lastNameFather: string,
+      lastNameMother: string,
+      dni: string,          // 8 digits
+      email: string,
+      birthDate: string,    // DD/MM/YYYY
+      sex: string,
+      address: string,
+      province: string,
+      district: string,
+      department: string,
+      salary: number,       // > 0
+      salaryInWords: string,
+      position: string,
+      entryDate: string,    // DD/MM/YYYY
+      endDate: string,      // DD/MM/YYYY
+      subDivisionOrParking: string,
+      contractType: "PLANILLA"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="PART TIME">
+    Part-time employment contracts with flexible hours.
+    
+    Uses the same fields as PLANILLA but set `contractType: "PART TIME"`.
+  </Tab>
+  
+  <Tab title="SUBSIDIO (Substitution)">
+    Temporary substitution contracts require additional fields:
+    
+    ```typescript
+    {
+      // ... all PLANILLA fields, plus:
+      replacementFor: string,        // Required
+      reasonForSubstitution: string, // Required
+      timeForCompany: string,        // Required
+      workingCondition: string,      // Required
+      probationaryPeriod: string,    // Required
+      contractType: "SUBSIDIO"
+    }
+    ```
+    
+    <Warning>
+      SUBSIDIO contracts will fail validation if any of the additional fields are missing.
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Validation Rules
+
+The API validates all employee data using Zod schemas. Common validation rules:
+
+| Field | Validation |
+|-------|------------|
+| `dni` | Exactly 8 numeric digits |
+| `email` | Valid email format |
+| `name`, `lastNameFather`, `lastNameMother` | 2-50 characters, letters only |
+| `salary` | Must be greater than 0 |
+| `entryDate`, `endDate` | Format: DD/MM/YYYY |
+| `contractType` | Must be: PLANILLA, PART TIME, or SUBSIDIO |
+
+## Common Issues and Solutions
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+  <Accordion title="Error: DNI debe tener exactamente 8 dígitos numéricos">
+    Ensure the DNI field contains exactly 8 numeric characters with no spaces or special characters.
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+    ```json
+    // ✅ Correct
+    "dni": "12345678"
+    
+    // ❌ Incorrect
+    "dni": "1234567"   // Too short
+    "dni": "12-345-678" // Contains hyphens
+    ```
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+  
+  <Accordion title="Error: Fecha debe estar en formato DD/MM/YYYY">
+    Date fields must use the exact format DD/MM/YYYY with leading zeros.
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+    ```json
+    // ✅ Correct
+    "entryDate": "01/04/2026"
+    
+    // ❌ Incorrect
+    "entryDate": "1/4/2026"      // Missing leading zeros
+    "entryDate": "2026-04-01"    // Wrong format
+    ```
+  </Accordion>
+  
+  <Accordion title="Puppeteer fails to launch on Linux">
+    If you're on Linux and Puppeteer fails, install required dependencies:
+    
+    ```bash
+    # Ubuntu/Debian
+    sudo apt-get install -y \
+      ca-certificates \
+      fonts-liberation \
+      libappindicator3-1 \
+      libasound2 \
+      libatk-bridge2.0-0 \
+      libatk1.0-0 \
+      libcups2 \
+      libdbus-1-3 \
+      libgdk-pixbuf2.0-0 \
+      libnspr4 \
+      libnss3 \
+      libx11-xcb1 \
+      libxcomposite1 \
+      libxdamage1 \
+      libxrandr2 \
+      xdg-utils
+    ```
+  </Accordion>
+  
+  <Accordion title="Maximum 50 employees per batch error">
+    The batch endpoint limits processing to 50 employees at a time for performance reasons.
+    
+    Split your data into smaller batches:
+    
+    ```typescript
+    // Process in chunks of 50
+    const chunkSize = 50;
+    for (let i = 0; i < employees.length; i += chunkSize) {
+      const chunk = employees.slice(i, i + chunkSize);
+      // Process chunk...
+    }
+    ```
   </Accordion>
 </AccordionGroup>
 
-### Step 2: Deploy your changes
+## Next Steps
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+<CardGroup cols={3}>
+  <Card title="Full Installation Guide" icon="download" href="/installation">
+    Detailed setup for production environments
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Complete API endpoint documentation
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Advanced configuration options
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Need Help?
+
+If you encounter any issues:
+
+1. Check the server logs for detailed error messages
+2. Verify your employee data against the validation schemas
+3. Review the [Installation Guide](/installation) for system requirements
+4. Consult the [API Reference](/api/overview) for endpoint specifications

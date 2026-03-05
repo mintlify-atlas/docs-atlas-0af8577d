@@ -1,0 +1,397 @@
+---
+title: "Employee Data Structure"
+description: "Complete reference for the EmployeeData interface and field requirements"
+icon: "user-circle"
+---
+
+## Overview
+
+The `EmployeeData` interface defines the complete structure for employee information in the Kontrak Backend system. It includes personal information, location details, employment terms, and contract-specific fields.
+
+## EmployeeData Interface
+
+```typescript src/types/employees.interface.ts
+export interface EmployeeData {
+  // Personal Information
+  name: string;
+  lastNameFather: string;
+  lastNameMother: string;
+  dni: string;
+  email: string;
+  sex?: string;
+  birthDate?: Date | string;
+  
+  // Location Information
+  province: string;
+  district: string;
+  department: string;
+  address: string;
+  
+  // Employment Terms
+  position: string;
+  subDivisionOrParking: string;
+  salary: number;
+  salaryInWords?: string;
+  entryDate: Date | string;
+  endDate: Date | string;
+  contractType: ContractType;
+  
+  // SUBSIDIO-Specific Fields
+  timeForCompany?: string;
+  replacementFor?: string;
+  reasonForSubstitution?: string;
+  workingCondition?: string;
+  probationaryPeriod?: string;
+}
+```
+
+## Field Reference
+
+### Personal Information Fields
+
+<Tabs>
+  <Tab title="Required">
+    #### name
+    - **Type:** `string`
+    - **Description:** Employee's first name
+    - **Excel Aliases:** "nombre", "name", "NOMBRE COMPLETO", "Nombre completo"
+    - **Validation:** Must not be empty
+    - **Example:** `"Juan"`
+
+    #### lastNameFather
+    - **Type:** `string`
+    - **Description:** Employee's paternal last name
+    - **Excel Aliases:** "apellido paterno", "APELLIDO PATERNO", "Apellido Paterno"
+    - **Validation:** Must not be empty
+    - **Example:** `"García"`
+
+    #### lastNameMother
+    - **Type:** `string`
+    - **Description:** Employee's maternal last name
+    - **Excel Aliases:** "apellido materno", "APELLIDO MATERNO", "Apellido Materno"
+    - **Validation:** Must not be empty
+    - **Example:** `"López"`
+
+    #### dni
+    - **Type:** `string`
+    - **Description:** Employee's DNI (national identity document)
+    - **Excel Aliases:** "dni", "DNI", "Documento de identidad"
+    - **Validation:** Must be unique across all employees in a batch
+    - **Example:** `"12345678"`
+    - **Note:** Automatically converted from number to string during Excel processing
+
+    #### email
+    - **Type:** `string`
+    - **Description:** Employee's email address
+    - **Excel Aliases:** "email", "Email", "EMAIL", "correo", "Correo"
+    - **Validation:** Must be a valid email format
+    - **Example:** `"juan.garcia@example.com"`
+  </Tab>
+  
+  <Tab title="Optional">
+    #### sex
+    - **Type:** `string | undefined`
+    - **Description:** Employee's gender
+    - **Excel Aliases:** "GENERO", "genero", "sexo", "SEXO", "sex"
+    - **Example:** `"M"` or `"F"`
+
+    #### birthDate
+    - **Type:** `Date | string | undefined`
+    - **Description:** Employee's date of birth
+    - **Excel Aliases:** "Fecha Nac.", "fecha de nacimiento", "FECHA DE NACIMIENTO"
+    - **Format:** Automatically formatted as `DD/MM/YYYY` from Excel dates
+    - **Example:** `"15/03/1990"`
+  </Tab>
+</Tabs>
+
+### Location Information Fields
+
+<Note>
+  All location fields are required for contract generation. They represent the employee's residential address.
+</Note>
+
+#### address
+- **Type:** `string`
+- **Description:** Complete street address
+- **Excel Aliases:** "dirección", "direccion", "address", "DOMICILIO", "domicilio"
+- **Example:** `"Av. Los Pinos 123, Urb. San José"`
+
+#### province
+- **Type:** `string`
+- **Description:** Province where the employee resides
+- **Excel Aliases:** "provincia", "province", "PROVINCIA", "Provincia"
+- **Example:** `"Lima"`
+
+#### district
+- **Type:** `string`
+- **Description:** District where the employee resides
+- **Excel Aliases:** "distrito", "district", "Distrito", "DISTRITO"
+- **Example:** `"San Isidro"`
+
+#### department
+- **Type:** `string`
+- **Description:** Department (region) where the employee resides
+- **Excel Aliases:** "departamento", "department", "division", "DEPARTAMENTO"
+- **Example:** `"Lima"`
+
+### Employment Terms Fields
+
+#### position
+- **Type:** `string`
+- **Required:** Yes
+- **Description:** Job title or position
+- **Excel Aliases:** "Cargo", "CARGO", "POSICION", "cargo", "Posicion"
+- **Example:** `"Operador de Estacionamiento"`
+
+#### subDivisionOrParking
+- **Type:** `string`
+- **Required:** Yes
+- **Description:** Parking lot or subdivision where employee will work
+- **Excel Aliases:** "playa", "estacionamiento", "PLAYA", "ESTACIONAMIENTO"
+- **Example:** `"Centro Comercial Plaza Norte"`
+
+#### salary
+- **Type:** `number`
+- **Required:** Yes
+- **Description:** Monthly salary amount
+- **Excel Processing:** Handles "S/." prefix and thousands separators automatically
+- **Example:** `1500.00`
+
+```typescript src/services/excel-parser.service.ts
+// Salary parsing example
+if (field === 'salary') {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === 'N/A') {
+      finalValue = null;
+    } else {
+      let cleanValue = trimmed.replace(/^S\/\.?\s*/i, '').trim();
+      cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
+      const num = Number(cleanValue);
+      finalValue = isNaN(num) ? null : num;
+    }
+  }
+}
+```
+
+#### salaryInWords
+- **Type:** `string | undefined`
+- **Required:** No (but recommended for contract clarity)
+- **Description:** Salary amount written in words
+- **Excel Aliases:** "salario en letras", "salarioenletras", "sueldo en letras"
+- **Example:** `"MIL QUINIENTOS Y 00/100 SOLES"`
+
+#### entryDate
+- **Type:** `Date | string`
+- **Required:** Yes
+- **Description:** Contract start date
+- **Excel Aliases:** "INICIO", "inicio", "fecha de ingreso", "entrydate"
+- **Format:** Automatically formatted as `DD/MM/YYYY`
+- **Example:** `"01/01/2024"`
+
+#### endDate
+- **Type:** `Date | string`
+- **Required:** Yes
+- **Description:** Contract end date
+- **Excel Aliases:** "FIN", "fecha de fin", "Fecha Fin", "Termino", "Fin Contrato"
+- **Format:** Automatically formatted as `DD/MM/YYYY`
+- **Example:** `"31/12/2024"`
+
+#### contractType
+- **Type:** `ContractType` ("PLANILLA" | "SUBSIDIO" | "PART TIME")
+- **Required:** Yes
+- **Description:** Type of employment contract
+- **Excel Aliases:** "tipo de contrato", "Tipo Contrato", "TIPO DE CONTRATO"
+- **Example:** `"PLANILLA"`
+
+<Info>
+  See the [Contract Types](/concepts/contract-types) page for detailed information about each contract type.
+</Info>
+
+### SUBSIDIO-Specific Fields
+
+<Warning>
+  These fields are required only for SUBSIDIO contract types. They are optional for PLANILLA and PART TIME contracts.
+</Warning>
+
+#### replacementFor
+- **Type:** `string | undefined`
+- **Required:** Yes for SUBSIDIO
+- **Description:** Full name of the employee being replaced
+- **Excel Aliases:** "Suplencia de:", "suplencia de", "SUPLENCIA DE", "Reemplazo:"
+- **Example:** `"María Fernández Torres"`
+- **Note:** Name is automatically split into components for template rendering
+
+#### reasonForSubstitution
+- **Type:** `string | undefined`
+- **Required:** Yes for SUBSIDIO
+- **Description:** Reason for the temporary replacement
+- **Excel Aliases:** "Motivo de Suplencia", "MOTIVO DE SUPLENCIA", "razón de suplencia"
+- **Example:** `"Licencia por maternidad"`
+
+#### timeForCompany
+- **Type:** `string | undefined`
+- **Required:** No
+- **Description:** How long the replacement employee has been with the company
+- **Excel Aliases:** "tiempo en empresa", "Tiempo en Empresa"
+- **Example:** `"6 meses"`
+
+#### workingCondition
+- **Type:** `string | undefined`
+- **Required:** No
+- **Description:** Specific working conditions for the replacement
+- **Excel Aliases:** "CONDICION LABORAL", "condición laboral", "Condicion Loboral"
+- **Example:** `"Tiempo completo"`
+
+#### probationaryPeriod
+- **Type:** `string | undefined`
+- **Required:** No
+- **Description:** Trial period duration
+- **Excel Aliases:** "PERIODO DE PRUEBA", "Periodo de prueba"
+- **Example:** `"3 meses"`
+
+## Extended Interfaces
+
+### EmployeeWithStatus
+
+Used during batch processing to track PDF generation status:
+
+```typescript src/types/employees.interface.ts
+export interface EmployeeWithStatus extends EmployeeData {
+  pdfGenerated?: boolean;  // Whether PDF was successfully created
+  pdfPath?: string;        // Path to generated PDF
+  errors?: string[];       // Any errors during processing
+  row?: number;            // Excel row number (for error reporting)
+}
+```
+
+### AddressData
+
+Subset interface for address information:
+
+```typescript src/types/employees.interface.ts
+export interface AddressData {
+  province: string;
+  district: string;
+  department: string;
+  address: string;
+}
+```
+
+## Validation Rules
+
+Employee data is validated using Zod schemas. The validation process:
+
+1. **Contract Type Check:** Validates the contract type is one of the three supported types
+2. **Required Field Validation:** Ensures all required fields for the contract type are present
+3. **DNI Uniqueness:** Checks for duplicate DNIs within the same batch
+4. **Format Validation:** Validates email format, date format, and numeric fields
+5. **Contract-Specific Validation:** For SUBSIDIO contracts, validates replacement fields
+
+```typescript src/services/validation.service.ts
+validateEmployee(
+  rowData: Record<string, unknown>,
+  rowNumber: number,
+  dniSet: Set<string>
+): {
+  errors: ValidationError[];
+  employee?: EmployeeData;
+}
+```
+
+<Accordion title="Common Validation Errors">
+  <AccordionItem title="DNI Errors">
+    - **Duplicate DNI:** DNI appears multiple times in the Excel file
+    - **Invalid Format:** DNI contains non-numeric characters
+    - **Missing DNI:** Required DNI field is empty
+  </AccordionItem>
+  
+  <AccordionItem title="Date Errors">
+    - **Invalid Format:** Date is not in DD/MM/YYYY format
+    - **Missing Required Date:** entryDate or endDate is empty
+    - **End Before Start:** endDate is before entryDate
+  </AccordionItem>
+  
+  <AccordionItem title="Contract Type Errors">
+    - **Invalid Type:** Contract type is not PLANILLA, SUBSIDIO, or PART TIME
+    - **Missing Type:** Contract type field is empty
+    - **Missing SUBSIDIO Fields:** SUBSIDIO contract missing replacementFor or reasonForSubstitution
+  </AccordionItem>
+  
+  <AccordionItem title="Field Format Errors">
+    - **Invalid Email:** Email does not match standard email format
+    - **Invalid Salary:** Salary is not a valid number
+    - **Empty Required Field:** Any required field is empty or null
+  </AccordionItem>
+</Accordion>
+
+## Example: Complete Employee Data
+
+### PLANILLA Contract Example
+
+```json
+{
+  "name": "Juan",
+  "lastNameFather": "García",
+  "lastNameMother": "López",
+  "dni": "12345678",
+  "email": "juan.garcia@example.com",
+  "sex": "M",
+  "birthDate": "15/03/1990",
+  "province": "Lima",
+  "district": "San Isidro",
+  "department": "Lima",
+  "address": "Av. Los Pinos 123, Urb. San José",
+  "position": "Operador de Estacionamiento",
+  "subDivisionOrParking": "Centro Comercial Plaza Norte",
+  "salary": 1500.00,
+  "salaryInWords": "MIL QUINIENTOS Y 00/100 SOLES",
+  "entryDate": "01/01/2024",
+  "endDate": "31/12/2024",
+  "contractType": "PLANILLA"
+}
+```
+
+### SUBSIDIO Contract Example
+
+```json
+{
+  "name": "Ana",
+  "lastNameFather": "Martínez",
+  "lastNameMother": "Sánchez",
+  "dni": "87654321",
+  "email": "ana.martinez@example.com",
+  "province": "Lima",
+  "district": "Miraflores",
+  "department": "Lima",
+  "address": "Calle Las Flores 456",
+  "position": "Supervisor de Playa",
+  "subDivisionOrParking": "Larcomar",
+  "salary": 2000.00,
+  "salaryInWords": "DOS MIL Y 00/100 SOLES",
+  "entryDate": "01/06/2024",
+  "endDate": "30/09/2024",
+  "contractType": "SUBSIDIO",
+  "replacementFor": "María Fernández Torres",
+  "reasonForSubstitution": "Licencia por maternidad",
+  "timeForCompany": "6 meses",
+  "workingCondition": "Tiempo completo"
+}
+```
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Contract Types" icon="file-contract" href="/concepts/contract-types">
+    Learn about PLANILLA, SUBSIDIO, and PART TIME contracts
+  </Card>
+  <Card title="Excel Processing" icon="file-excel" href="/concepts/excel-processing">
+    How employee data is imported from Excel files
+  </Card>
+  <Card title="PDF Generation" icon="file-pdf" href="/concepts/pdf-generation">
+    How employee data is rendered into PDF contracts
+  </Card>
+  <Card title="Error Handling" icon="shield-check" href="/guides/error-handling">
+    Validation and error handling guide
+  </Card>
+</CardGroup>

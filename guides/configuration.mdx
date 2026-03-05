@@ -1,0 +1,274 @@
+---
+title: 'Configuration'
+description: 'Learn how to configure Kontrak Backend for development and production environments'
+icon: 'gear'
+---
+
+## Overview
+
+Kontrak Backend uses environment variables for configuration. All settings are loaded from a `.env` file and accessed through a centralized configuration module.
+
+## Environment Variables
+
+### Server Configuration
+
+<ParamField path="NODE_ENV" type="string" default="development">
+  Application environment. Set to `production` for production deployments.
+</ParamField>
+
+<ParamField path="PORT" type="number" default="3000">
+  Port number where the server will listen for requests.
+</ParamField>
+
+<ParamField path="HOST" type="string" default="localhost">
+  Hostname for the server. Use `0.0.0.0` to accept connections from any network interface.
+</ParamField>
+
+### CORS Configuration
+
+<ParamField path="CORS_ORIGINS" type="string" default="http://localhost:3000,http://localhost:5173">
+  Comma-separated list of allowed origins for CORS requests.
+  
+  **Example:**
+  ```bash
+  CORS_ORIGINS=http://localhost:3000,https://app.example.com,https://admin.example.com
+  ```
+</ParamField>
+
+<Note>
+  The CORS middleware will log blocked origins to help you debug access issues. Check your server logs if you're experiencing CORS errors.
+</Note>
+
+### File Limits
+
+<ParamField path="MAX_FILE_SIZE" type="number" default="10485760">
+  Maximum file size in bytes. Default is 10MB (10485760 bytes).
+</ParamField>
+
+<ParamField path="MAX_EMPLOYEES" type="number" default="1000">
+  Maximum number of employees that can be processed in a single batch operation.
+</ParamField>
+
+### Directories
+
+<ParamField path="TEMP_DIR" type="string" default="./temp">
+  Directory path for storing temporary files during contract generation.
+</ParamField>
+
+### Timeouts & Cleanup
+
+<ParamField path="FILE_CLEANUP_TIMEOUT" type="number" default="3600000">
+  Timeout in milliseconds before temporary files are cleaned up. Default is 1 hour (3600000ms).
+</ParamField>
+
+## Configuration File Structure
+
+The configuration is centralized in `src/config/index.ts`:
+
+```typescript
+export const config = {
+  server: {
+    env: process.env.NODE_ENV || 'development',
+    port: parseInt(process.env.PORT || '3000', 10),
+    host: process.env.HOST || 'localhost',
+  },
+  cors: {
+    origins: process.env.CORS_ORIGINS || ['http://localhost:5173'],
+  },
+  limits: {
+    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760', 10),
+    maxEmployees: parseInt(process.env.MAX_EMPLOYEES || '1000', 10),
+  },
+  paths: {
+    temp: path.resolve(process.env.TEMP_DIR || './temp'),
+    templates: path.resolve('./src/templates'),
+  },
+};
+```
+
+## Setting Up Your Environment
+
+<Steps>
+  <Step title="Copy the example file">
+    Create your `.env` file from the example:
+    
+    ```bash
+    cp .env.example .env
+    ```
+  </Step>
+  
+  <Step title="Configure for your environment">
+    Edit `.env` with your specific settings:
+    
+    ```bash
+    NODE_ENV=development
+    PORT=3000
+    HOST=localhost
+    CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    MAX_FILE_SIZE=10485760
+    MAX_EMPLOYEES=1000
+    FILE_CLEANUP_TIMEOUT=3600000
+    TEMP_DIR=./temp
+    ```
+  </Step>
+  
+  <Step title="Create required directories">
+    Ensure the temp directory exists:
+    
+    ```bash
+    mkdir -p temp
+    ```
+  </Step>
+</Steps>
+
+## CORS Setup Details
+
+The CORS configuration (`src/config/cors.config.ts`) supports:
+
+- **Dynamic origin validation**: Only whitelisted origins are allowed
+- **Logging**: Blocked origins are logged for debugging
+- **HTTP Methods**: GET, POST, PUT, DELETE, PATCH
+
+```typescript
+export const corsConfig: CorsOptions = {
+  origin: (origin, callback) => {
+    const whiteList = process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',').map((url) => url.trim())
+      : ['http://localhost:5173'];
+
+    if (!origin || whiteList.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+};
+```
+
+## Production Settings
+
+<Warning>
+  Always configure these settings properly for production deployments.
+</Warning>
+
+### Recommended Production Configuration
+
+```bash
+# Production Environment
+NODE_ENV=production
+PORT=8080
+HOST=0.0.0.0
+
+# CORS - Add your production domains
+CORS_ORIGINS=https://app.yourdomain.com,https://admin.yourdomain.com
+
+# File Limits - Adjust based on your needs
+MAX_FILE_SIZE=20971520  # 20MB for production
+MAX_EMPLOYEES=500       # Limit batch size
+
+# Cleanup - Clean up files faster in production
+FILE_CLEANUP_TIMEOUT=1800000  # 30 minutes
+
+# Directories - Use absolute paths
+TEMP_DIR=/var/app/temp
+```
+
+### Security Considerations
+
+<AccordionGroup>
+  <Accordion title="CORS Origins">
+    - Never use wildcards (`*`) in production
+    - Only whitelist domains you own and control
+    - Include all subdomains that need access
+    - Use HTTPS URLs in production
+  </Accordion>
+  
+  <Accordion title="File Size Limits">
+    - Set `MAX_FILE_SIZE` based on your server capacity
+    - Too large files can cause memory issues
+    - Consider implementing virus scanning for uploaded files
+  </Accordion>
+  
+  <Accordion title="Temporary Files">
+    - Ensure `TEMP_DIR` has adequate disk space
+    - Configure `FILE_CLEANUP_TIMEOUT` to prevent disk filling
+    - Consider using a separate partition for temp files
+    - Implement monitoring for disk usage
+  </Accordion>
+  
+  <Accordion title="Environment Variables">
+    - Never commit `.env` files to version control
+    - Use secret management systems in production
+    - Rotate sensitive credentials regularly
+    - Validate all environment variables on startup
+  </Accordion>
+</AccordionGroup>
+
+## Validating Configuration
+
+The application validates critical configuration on startup:
+
+```typescript
+export const validateConfig = (): void => {
+  const isDevelopment = config.server.env === 'development';
+
+  if (!isDevelopment && !process.env.PORT) {
+    console.warn('WARNING: PORT no está configurado en producción');
+  }
+
+  console.info('Configuración cargada:', {
+    env: config.server.env,
+    port: config.server.port,
+    host: config.server.host,
+  });
+};
+```
+
+## Troubleshooting
+
+### Port Already in Use
+
+If you get an `EADDRINUSE` error:
+
+```bash
+# Change the port in .env
+PORT=3001
+```
+
+### CORS Errors
+
+Check server logs for blocked origins:
+
+```bash
+🚫 CORS Bloqueado: http://localhost:8080
+✅ Permitidos: ['http://localhost:3000', 'http://localhost:5173']
+```
+
+Add the blocked origin to `CORS_ORIGINS`.
+
+### File Upload Errors
+
+If files fail to upload:
+
+1. Check `MAX_FILE_SIZE` setting
+2. Verify `TEMP_DIR` exists and is writable
+3. Ensure sufficient disk space
+
+### Configuration Not Loading
+
+1. Verify `.env` file is in the project root
+2. Check for syntax errors in `.env`
+3. Restart the server after changes
+4. Review startup logs for configuration warnings
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Generating Contracts" icon="file-contract" href="/guides/generating-contracts">
+    Learn how to generate employment contracts
+  </Card>
+  <Card title="Excel Upload" icon="file-excel" href="/guides/excel-upload">
+    Understand Excel file format requirements
+  </Card>
+</CardGroup>

@@ -1,0 +1,530 @@
+---
+title: Upload Excel for Addendum
+description: Upload an Excel file to process and generate addendum data for multiple employees
+api: POST /api/addendum/upload
+---
+
+## Overview
+
+This endpoint allows you to upload an Excel file containing employee addendum information. The system will validate the data and return a structured response with employee details ready for addendum generation.
+
+## Request
+
+### Headers
+
+<ParamField header="Content-Type" type="string" required>
+  Must be `multipart/form-data`
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="excel" type="file" required>
+  Excel file containing employee addendum data
+  
+  **Allowed formats:** `.xlsx`, `.xls`, `.csv`
+  
+  **Maximum file size:** 10MB (10,485,760 bytes)
+  
+  **MIME types accepted:**
+  - `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+  - `application/vnd.ms-excel`
+  - `application/excel`
+  - `application/x-excel`
+  - `application/x-msexcel`
+</ParamField>
+
+## Excel File Structure
+
+The Excel file must contain the following columns (field names are flexible - aliases are accepted):
+
+### Required Fields
+
+<ParamField body="division" type="string" required>
+  Division or work area
+  
+  **Aliases:** DIVISION, división, division, area, AREA, Division
+  
+  **Validation:** Required, trimmed string
+</ParamField>
+
+<ParamField body="documentNumber" type="string" required>
+  Employee's document number (DNI)
+  
+  **Aliases:** Numero Documento, dni, documento, NÚMERO DE DOCUMENTO, Num. Documento
+  
+  **Validation:** Must be exactly 8 digits
+</ParamField>
+
+<ParamField body="worker" type="string" required>
+  Full name of the employee
+  
+  **Aliases:** TRABAJADOR, trabajador, nombres y apellidos, empleado, colaborador, Trabajador
+  
+  **Validation:** Required string
+</ParamField>
+
+<ParamField body="entryDate" type="string" required>
+  Employee's original entry date to the company
+  
+  **Aliases:** fecha de ingreso, fechadeingreso, fecha_de_ingreso, entrydate, entry_date, fecha ingreso, Fecha Ingreso
+  
+  **Format:** DD/MM/YYYY
+  
+  **Example:** 15/03/2024
+</ParamField>
+
+<ParamField body="start" type="string" required>
+  Original contract start date
+  
+  **Aliases:** INICIO, inicio, Inicio
+  
+  **Format:** DD/MM/YYYY
+  
+  **Example:** 01/01/2024
+</ParamField>
+
+<ParamField body="end" type="string" required>
+  Original contract end date
+  
+  **Aliases:** FECHA FIN, fecha fin, fin contrato, termino, Fin, FIN, fin
+  
+  **Format:** DD/MM/YYYY
+  
+  **Example:** 31/12/2024
+</ParamField>
+
+<ParamField body="startAddendum" type="string" required>
+  Addendum effective start date
+  
+  **Aliases:** INICIO ADENDA, inicio adenda, fecha inicio adenda, vigencia desde, Inicio Adenda
+  
+  **Format:** DD/MM/YYYY
+  
+  **Example:** 01/01/2025
+</ParamField>
+
+<ParamField body="endAddendum" type="string" required>
+  Addendum effective end date
+  
+  **Aliases:** FIN ADENDA, fin adenda, fecha fin adenda, vigencia hasta
+  
+  **Format:** DD/MM/YYYY
+  
+  **Example:** 31/12/2025
+</ParamField>
+
+<ParamField body="address" type="string" required>
+  Employee's address
+  
+  **Aliases:** dirección, direccion, address, direccion completa, DOMICILIO, domicilio, Dirección
+  
+  **Validation:** 
+  - Minimum 5 characters
+  - Maximum 200 characters
+  - Trimmed
+</ParamField>
+
+<ParamField body="province" type="string" required>
+  Province where the employee resides
+  
+  **Aliases:** provincia, province, PROVINCIA, Provincia
+  
+  **Validation:** Minimum 2 characters, trimmed
+</ParamField>
+
+<ParamField body="district" type="string" required>
+  District where the employee resides
+  
+  **Aliases:** distrito, district, Distrito, DISTRITO
+  
+  **Validation:** Minimum 2 characters, trimmed
+</ParamField>
+
+<ParamField body="department" type="string" required>
+  Department where the employee resides
+  
+  **Aliases:** departamento, department, division, Departamento, DEPARTAMENTO
+  
+  **Validation:** Minimum 2 characters, trimmed
+</ParamField>
+
+<ParamField body="salary" type="number" required>
+  Employee's salary amount
+  
+  **Aliases:** salario, salary, sueldo, remuneracion, remuneración, Sueldo, SUELDO
+  
+  **Validation:** Must be a positive number greater than 0
+  
+  **Example:** 2500.00
+</ParamField>
+
+<ParamField body="salaryInWords" type="string" required>
+  Employee's salary written in words
+  
+  **Aliases:** salario en letras, salarioenletras, salario_en_letras, salaryinwords, salary_in_words, sueldo en letras, Sueldo en Letras
+  
+  **Validation:** 
+  - Minimum 5 characters
+  - Maximum 100 characters
+  - Trimmed
+  
+  **Example:** Dos mil quinientos soles
+</ParamField>
+
+### Excel File Notes
+
+- The first row should contain column headers
+- Empty rows are automatically skipped
+- Column names are case-insensitive and flexible (multiple aliases accepted)
+- Maximum 80 employees per batch
+- All date fields must be in DD/MM/YYYY format
+
+## Response
+
+<ResponseField name="success" type="boolean" required>
+  Indicates if the operation was successful
+</ResponseField>
+
+<ResponseField name="data" type="object" required>
+  Contains the processed employee data
+  
+  <ResponseField name="data.totalRecords" type="number">
+    Total number of employee records processed
+  </ResponseField>
+  
+  <ResponseField name="data.employees" type="array">
+    Array of employee objects with validated addendum data
+    
+    <ResponseField name="data.employees[].division" type="string">
+      Employee's division or work area
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].documentNumber" type="string">
+      Employee's DNI (8 digits)
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].worker" type="string">
+      Full name of the employee
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].entryDate" type="string">
+      Original entry date (DD/MM/YYYY)
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].start" type="string">
+      Original contract start date (DD/MM/YYYY)
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].end" type="string">
+      Original contract end date (DD/MM/YYYY)
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].startAddendum" type="string">
+      Addendum start date (DD/MM/YYYY)
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].endAddendum" type="string">
+      Addendum end date (DD/MM/YYYY)
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].address" type="string">
+      Employee's address
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].province" type="string">
+      Employee's province
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].district" type="string">
+      Employee's district
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].department" type="string">
+      Employee's department
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].salary" type="number">
+      Employee's salary amount
+    </ResponseField>
+    
+    <ResponseField name="data.employees[].salaryInWords" type="string">
+      Employee's salary in words
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+### Success Response Example
+
+```json
+{
+  "success": true,
+  "data": {
+    "totalRecords": 2,
+    "employees": [
+      {
+        "division": "Recursos Humanos",
+        "documentNumber": "12345678",
+        "worker": "Juan Pérez García",
+        "entryDate": "15/03/2023",
+        "start": "01/01/2024",
+        "end": "31/12/2024",
+        "startAddendum": "01/01/2025",
+        "endAddendum": "31/12/2025",
+        "address": "Av. Los Héroes 123, San Isidro",
+        "province": "Lima",
+        "district": "San Isidro",
+        "department": "Lima",
+        "salary": 2500,
+        "salaryInWords": "Dos mil quinientos soles"
+      },
+      {
+        "division": "Ventas",
+        "documentNumber": "87654321",
+        "worker": "María López Rodríguez",
+        "entryDate": "10/05/2023",
+        "start": "01/02/2024",
+        "end": "31/01/2025",
+        "startAddendum": "01/02/2025",
+        "endAddendum": "31/01/2026",
+        "address": "Jr. Las Flores 456, Miraflores",
+        "province": "Lima",
+        "district": "Miraflores",
+        "department": "Lima",
+        "salary": 3000,
+        "salaryInWords": "Tres mil soles"
+      }
+    ]
+  }
+}
+```
+
+## Error Responses
+
+### No File Provided (400)
+
+```json
+{
+  "success": false,
+  "message": "No se recibió ningún archivo. Envía un campo \"excel\""
+}
+```
+
+### Invalid File Type (400)
+
+```json
+{
+  "success": false,
+  "message": "Tipo de archivo no permitidos .pdf. solo se permiten archivos Excel( .xlsx, .xls,.csv)"
+}
+```
+
+### Invalid File Extension (400)
+
+```json
+{
+  "success": false,
+  "message": "Extensiones de archivo no permitidas: .txt. Solo se permiten: .xlsx, .xls, .csv"
+}
+```
+
+### File Too Large (400)
+
+```json
+{
+  "success": false,
+  "message": "El archivo excede el tamaño máximo permitido de 10MB"
+}
+```
+
+### Validation Error (400)
+
+```json
+{
+  "success": false,
+  "message": "Error de validación en los datos",
+  "errors": [
+    {
+      "row": 2,
+      "field": "documentNumber",
+      "message": "DNI debe tener exactamente 8 dígitos."
+    },
+    {
+      "row": 3,
+      "field": "salary",
+      "message": "El sueldo debe ser mayor a 0"
+    }
+  ]
+}
+```
+
+### Too Many Employees (400)
+
+```json
+{
+  "success": false,
+  "message": "Máximo 80 empleados por lote"
+}
+```
+
+### Missing Required Field (400)
+
+```json
+{
+  "success": false,
+  "message": "Campo requerido faltante: division",
+  "errors": [
+    {
+      "row": 5,
+      "field": "division",
+      "message": "Division es requerido."
+    }
+  ]
+}
+```
+
+### Invalid Date Format (400)
+
+```json
+{
+  "success": false,
+  "message": "Error de validación en los datos",
+  "errors": [
+    {
+      "row": 4,
+      "field": "entryDate",
+      "message": "Fecha debe estar en formato DD/MM/YYYY"
+    }
+  ]
+}
+```
+
+## Example Requests
+
+### cURL
+
+```bash
+curl -X POST https://api.example.com/api/addendum/upload \
+  -H "Content-Type: multipart/form-data" \
+  -F "excel=@/path/to/addendum_employees.xlsx"
+```
+
+### cURL with Authentication
+
+```bash
+curl -X POST https://api.example.com/api/addendum/upload \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: multipart/form-data" \
+  -F "excel=@/path/to/addendum_employees.xlsx"
+```
+
+### JavaScript (Fetch API)
+
+```javascript
+const formData = new FormData();
+const fileInput = document.querySelector('input[type="file"]');
+formData.append('excel', fileInput.files[0]);
+
+fetch('https://api.example.com/api/addendum/upload', {
+  method: 'POST',
+  body: formData
+})
+  .then(response => response.json())
+  .then(data => {
+    console.log('Success:', data);
+    console.log('Total records:', data.data.totalRecords);
+    console.log('Employees:', data.data.employees);
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+```
+
+### Python (Requests)
+
+```python
+import requests
+
+url = 'https://api.example.com/api/addendum/upload'
+files = {'excel': open('addendum_employees.xlsx', 'rb')}
+
+response = requests.post(url, files=files)
+data = response.json()
+
+if data['success']:
+    print(f"Total records: {data['data']['totalRecords']}")
+    for employee in data['data']['employees']:
+        print(f"Employee: {employee['worker']} - DNI: {employee['documentNumber']}")
+else:
+    print(f"Error: {data['message']}")
+```
+
+### Node.js (Axios)
+
+```javascript
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+
+const form = new FormData();
+form.append('excel', fs.createReadStream('addendum_employees.xlsx'));
+
+axios.post('https://api.example.com/api/addendum/upload', form, {
+  headers: form.getHeaders()
+})
+  .then(response => {
+    console.log('Success:', response.data);
+    console.log('Total records:', response.data.data.totalRecords);
+  })
+  .catch(error => {
+    console.error('Error:', error.response?.data || error.message);
+  });
+```
+
+## Validation Rules Summary
+
+| Field | Type | Format | Min | Max | Special Rules |
+|-------|------|--------|-----|-----|---------------|
+| division | string | - | - | - | Required, trimmed |
+| documentNumber | string | 8 digits | - | - | Exactly 8 numeric digits |
+| worker | string | - | - | - | Required |
+| entryDate | string | DD/MM/YYYY | - | - | Valid date format |
+| start | string | DD/MM/YYYY | - | - | Valid date format |
+| end | string | DD/MM/YYYY | - | - | Valid date format |
+| startAddendum | string | DD/MM/YYYY | - | - | Valid date format |
+| endAddendum | string | DD/MM/YYYY | - | - | Valid date format |
+| address | string | - | 5 chars | 200 chars | Trimmed |
+| province | string | - | 2 chars | - | Trimmed |
+| district | string | - | 2 chars | - | Trimmed |
+| department | string | - | 2 chars | - | Trimmed |
+| salary | number | - | > 0 | - | Must be positive |
+| salaryInWords | string | - | 5 chars | 100 chars | Trimmed |
+
+## Best Practices
+
+1. **File Preparation**
+   - Use the first row for column headers
+   - Ensure all required fields are present
+   - Use consistent date formatting (DD/MM/YYYY)
+   - Verify DNI numbers are exactly 8 digits
+   - Remove any empty rows from your Excel file
+
+2. **Data Validation**
+   - Validate salary values are positive numbers
+   - Check that all dates are in the correct format
+   - Ensure addresses meet minimum character requirements
+   - Verify salary in words matches the numeric value
+
+3. **Error Handling**
+   - Check the response for validation errors
+   - Review the specific row and field mentioned in error messages
+   - Correct errors in the Excel file and re-upload
+
+4. **Performance**
+   - Keep batch sizes under 80 employees
+   - Use compressed Excel files (.xlsx) for faster uploads
+   - Ensure file size is under 10MB limit
+
+## Related Endpoints
+
+- [Upload Contract Excel](/api/excel/upload) - Upload Excel for contract generation
+- [Generate Contracts](/api/contracts/download-zip) - Generate contract PDFs

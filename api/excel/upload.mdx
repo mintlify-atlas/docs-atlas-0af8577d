@@ -1,0 +1,260 @@
+---
+title: Upload Excel
+description: Upload and validate an Excel file containing employee contract data
+---
+
+## Endpoint
+
+<api method="POST" url="/api/excel/upload" />
+
+Uploads an Excel file containing employee data, validates it against the required schema, and returns the parsed employee records.
+
+## Request
+
+### Headers
+
+```json
+{
+  "Content-Type": "multipart/form-data"
+}
+```
+
+### Body Parameters
+
+<ParamField body="excel" type="file" required>
+  Excel file (.xlsx) containing employee contract data. The file must contain specific headers and follow the expected format.
+</ParamField>
+
+### Required Excel Headers
+
+The Excel file must contain the following columns (case-insensitive, accent-insensitive):
+
+**Basic Information:**
+- `NOMBRE` or `Nombre completo` - Employee's first name
+- `APELLIDO PATERNO` - Father's last name
+- `APELLIDO MATERNO` - Mother's last name
+- `DNI` - Document number (8 digits)
+- `EMAIL` or `Correo` - Email address
+
+**Location:**
+- `DIRECCIÓN` or `DOMICILIO` - Full address
+- `PROVINCIA` - Province
+- `DISTRITO` - District
+- `DEPARTAMENTO` - Department
+
+**Employment Details:**
+- `CARGO` - Position/Job title
+- `PLAYA` or `ESTACIONAMIENTO` - Work location/parking
+- `SUELDO` - Salary (numeric)
+- `SUELDO EN LETRAS` - Salary in words
+- `INICIO` or `FECHA DE INGRESO` - Start date (DD/MM/YYYY)
+- `FIN` or `FECHA DE TERMINO` - End date (DD/MM/YYYY)
+- `TIPO DE CONTRATO` - Contract type (PLANILLA, PART TIME, or SUBSIDIO)
+
+**Optional Fields:**
+- `GENERO` or `SEXO` - Gender
+- `FECHA DE NACIMIENTO` - Birth date (DD/MM/YYYY)
+
+**Required for SUBSIDIO contracts only:**
+- `SUPLENCIA DE` - Name of person being replaced
+- `MOTIVO DE SUPLENCIA` - Reason for replacement
+- `TIEMPO EN EMPRESA` - Time at company
+- `CONDICION LABORAL` - Working condition
+- `PERIODO DE PRUEBA` - Probationary period
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the upload was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message with number of employees imported
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="totalRecords" type="number">
+      Total number of records in the Excel file
+    </ResponseField>
+
+    <ResponseField name="employees" type="array">
+      Array of validated employee records
+      <Expandable title="Employee object properties">
+        <ResponseField name="name" type="string">Employee's first name</ResponseField>
+        <ResponseField name="lastNameFather" type="string">Father's last name</ResponseField>
+        <ResponseField name="lastNameMother" type="string">Mother's last name</ResponseField>
+        <ResponseField name="dni" type="string">8-digit DNI</ResponseField>
+        <ResponseField name="email" type="string">Email address</ResponseField>
+        <ResponseField name="address" type="string">Full address</ResponseField>
+        <ResponseField name="province" type="string">Province</ResponseField>
+        <ResponseField name="district" type="string">District</ResponseField>
+        <ResponseField name="department" type="string">Department</ResponseField>
+        <ResponseField name="position" type="string">Job position</ResponseField>
+        <ResponseField name="subDivisionOrParking" type="string">Work location</ResponseField>
+        <ResponseField name="salary" type="number">Salary amount</ResponseField>
+        <ResponseField name="salaryInWords" type="string">Salary in words</ResponseField>
+        <ResponseField name="entryDate" type="string">Start date (DD/MM/YYYY)</ResponseField>
+        <ResponseField name="endDate" type="string">End date (DD/MM/YYYY)</ResponseField>
+        <ResponseField name="contractType" type="string">PLANILLA, PART TIME, or SUBSIDIO</ResponseField>
+        <ResponseField name="sex" type="string" optional>Gender</ResponseField>
+        <ResponseField name="birthDate" type="string" optional>Birth date (DD/MM/YYYY)</ResponseField>
+        <ResponseField name="replacementFor" type="string" optional>Name of person being replaced (SUBSIDIO only)</ResponseField>
+        <ResponseField name="reasonForSubstitution" type="string" optional>Reason for replacement (SUBSIDIO only)</ResponseField>
+        <ResponseField name="timeForCompany" type="string" optional>Time at company (SUBSIDIO only)</ResponseField>
+        <ResponseField name="workingCondition" type="string" optional>Working condition (SUBSIDIO only)</ResponseField>
+        <ResponseField name="probationaryPeriod" type="string" optional>Probationary period (SUBSIDIO only)</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.kontrak.com/api/excel/upload \
+  -H "Content-Type: multipart/form-data" \
+  -F "excel=@/path/to/employees.xlsx"
+```
+
+```javascript JavaScript
+const formData = new FormData();
+formData.append('excel', fileInput.files[0]);
+
+const response = await fetch('https://api.kontrak.com/api/excel/upload', {
+  method: 'POST',
+  body: formData
+});
+
+const data = await response.json();
+```
+
+```python Python
+import requests
+
+files = {'excel': open('employees.xlsx', 'rb')}
+response = requests.post(
+  'https://api.kontrak.com/api/excel/upload',
+  files=files
+)
+
+data = response.json()
+```
+</CodeGroup>
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "message": "Se importaron 15 empleados correctamente.",
+  "data": {
+    "totalRecords": 15,
+    "employees": [
+      {
+        "name": "Juan",
+        "lastNameFather": "Pérez",
+        "lastNameMother": "García",
+        "dni": "12345678",
+        "email": "juan.perez@example.com",
+        "address": "Av. Principal 123",
+        "province": "Lima",
+        "district": "Miraflores",
+        "department": "Lima",
+        "position": "Operario",
+        "subDivisionOrParking": "Playa 1",
+        "salary": 1500,
+        "salaryInWords": "Mil quinientos soles",
+        "entryDate": "01/03/2024",
+        "endDate": "31/12/2024",
+        "contractType": "PLANILLA",
+        "sex": "M",
+        "birthDate": "15/06/1990"
+      }
+    ]
+  }
+}
+```
+
+## Error Responses
+
+### No File Provided
+
+```json
+{
+  "success": false,
+  "message": "No se recibió ningún archivo Excel."
+}
+```
+
+### Invalid Headers
+
+```json
+{
+  "success": false,
+  "message": "La estructura del archivo es incorrecta. Faltan columnas obligatorias.",
+  "context": {
+    "validationErrors": [
+      {
+        "row": 1,
+        "field": "NOMBRE",
+        "message": "Encabezado requerido no encontrado en el archivo."
+      },
+      {
+        "row": 1,
+        "field": "DNI",
+        "message": "Encabezado requerido no encontrado en el archivo."
+      }
+    ]
+  }
+}
+```
+
+### Validation Errors
+
+```json
+{
+  "success": false,
+  "message": "No se pudo procesar el archivo. Se encontraron 3 errores.",
+  "context": {
+    "validationErrors": [
+      {
+        "row": 2,
+        "field": "dni",
+        "message": "DNI debe tener exactamente 8 dígitos numéricos."
+      },
+      {
+        "row": 3,
+        "field": "email",
+        "message": "El correo es requerido"
+      },
+      {
+        "row": 5,
+        "field": "salary",
+        "message": "El sueldo debe ser mayor a 0"
+      }
+    ]
+  }
+}
+```
+
+### Corrupt File
+
+```json
+{
+  "success": false,
+  "message": "El archivo Excel está corrupto o no es un archivo válido"
+}
+```
+
+## Notes
+
+- The file must be in `.xlsx` format (Excel 2007+)
+- Date format must be `DD/MM/YYYY`
+- DNI must be exactly 8 digits
+- Salary must be a positive number
+- Maximum 50 employees per batch
+- The first row must contain the headers
+- Empty rows are automatically skipped
+- Header matching is case-insensitive and accent-insensitive

@@ -1,0 +1,429 @@
+---
+title: 'Generating Contracts'
+description: 'Step-by-step guide to generating employment contracts using the Kontrak API'
+icon: 'file-contract'
+---
+
+## Overview
+
+Kontrak Backend can generate three types of employment contracts:
+- **PLANILLA**: Full-time contracts with all legal benefits
+- **PART TIME**: Part-time employment contracts
+- **SUBSIDIO**: Temporary replacement contracts
+
+Contracts are generated as PDF files and can be downloaded individually or in bulk as a ZIP archive.
+
+## Contract Types
+
+<AccordionGroup>
+  <Accordion title="PLANILLA - Full-Time Contract">
+    Standard employment contract with all legal benefits.
+    
+    **Required Fields:**
+    - Basic employee information (name, DNI, address)
+    - Position and subdivision/parking
+    - Salary information
+    - Entry and end dates
+    - Location details (province, district, department)
+  </Accordion>
+  
+  <Accordion title="PART TIME - Part-Time Contract">
+    Part-time employment with reduced hours.
+    
+    **Required Fields:**
+    - Same as PLANILLA contract
+    - No additional fields required
+  </Accordion>
+  
+  <Accordion title="SUBSIDIO - Replacement Contract">
+    Temporary contract for replacing another employee.
+    
+    **Required Fields:**
+    - All PLANILLA fields
+    - **Additional fields:**
+      - `replacementFor`: Name of employee being replaced
+      - `reasonForSubstitution`: Reason for the replacement
+      - `timeForCompany`: Time in company (optional)
+      - `workingCondition`: Working condition (optional)
+      - `probationaryPeriod`: Probationary period (optional)
+  </Accordion>
+</AccordionGroup>
+
+## Generating Contracts in Bulk
+
+### Step 1: Prepare Employee Data
+
+You can upload employee data via Excel file or send it directly as JSON.
+
+<Tabs>
+  <Tab title="Via Excel Upload">
+    Upload an Excel file with employee data:
+    
+    ```bash
+    curl -X POST http://localhost:3000/api/excel/upload \
+      -F "excel=@employees.xlsx" \
+      -H "Content-Type: multipart/form-data"
+    ```
+    
+    **Response:**
+    ```json
+    {
+      "success": true,
+      "message": "Excel procesado correctamente",
+      "data": {
+        "employees": [
+          {
+            "name": "Juan",
+            "lastNameFather": "Pérez",
+            "lastNameMother": "García",
+            "dni": "12345678",
+            "contractType": "Planilla",
+            // ... other fields
+          }
+        ],
+        "totalRecords": 10
+      }
+    }
+    ```
+    
+    See [Excel Upload Guide](/guides/excel-upload) for Excel format details.
+  </Tab>
+  
+  <Tab title="Via JSON API">
+    Send employee data directly as JSON:
+    
+    ```bash
+    curl -X POST http://localhost:3000/api/contract/download-zip \
+      -H "Content-Type: application/json" \
+      -d '{
+        "body": [
+          {
+            "name": "Juan",
+            "lastNameFather": "Pérez",
+            "lastNameMother": "García",
+            "dni": "12345678",
+            "email": "juan.perez@example.com",
+            "birthDate": "15/03/1990",
+            "sex": "M",
+            "address": "Av. Principal 123",
+            "province": "Lima",
+            "district": "Miraflores",
+            "department": "Lima",
+            "salary": 3000,
+            "salaryInWords": "tres mil soles",
+            "position": "Analista",
+            "entryDate": "01/01/2024",
+            "endDate": "31/12/2024",
+            "subDivisionOrParking": "Sede Central",
+            "contractType": "Planilla"
+          }
+        ]
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+### Step 2: Download ZIP Archive
+
+<Steps>
+  <Step title="Send batch request">
+    Send the employee data array to the `/contract/download-zip` endpoint:
+    
+    ```bash
+    curl -X POST http://localhost:3000/api/contract/download-zip \
+      -H "Content-Type: application/json" \
+      -d @employees.json \
+      --output contracts.zip
+    ```
+  </Step>
+  
+  <Step title="Receive ZIP file">
+    The response is a ZIP file containing:
+    - Contract PDFs for each employee
+    - Data processing consent PDFs
+    - Annex documents
+    
+    **ZIP Structure:**
+    ```
+    contracts.zip
+    ├── planilla/
+    │   ├── 12345678.pdf
+    │   ├── Tratamiento de datos/
+    │   │   └── 12345678.pdf
+    │   └── Anexos/
+    │       └── 12345678.pdf
+    ├── parttime/
+    │   └── ...
+    └── subsidio/
+        └── ...
+    ```
+  </Step>
+  
+  <Step title="Extract and use">
+    Extract the ZIP file and distribute contracts:
+    
+    ```bash
+    unzip contracts.zip -d output/
+    ```
+  </Step>
+</Steps>
+
+## Generating Single Contracts
+
+### Preview Contract (Base64)
+
+Get a contract preview as base64 encoded string:
+
+```bash
+curl -X POST http://localhost:3000/api/contract/preview \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "abc123",
+    "dni": "12345678",
+    "format": "base64"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "dni": "12345678",
+    "pdfBase64": "JVBERi0xLjQKJeLjz9MKMyAwIG9iago8...",
+    "fileName": "12345678.pdf"
+  }
+}
+```
+
+### Download Contract File
+
+Get contract as downloadable PDF:
+
+```bash
+curl -X POST http://localhost:3000/api/contract/preview \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "abc123",
+    "dni": "12345678",
+    "format": "file"
+  }' \
+  --output contract.pdf
+```
+
+## Contract Generation Process
+
+The contract generation process (`src/services/contract.service.ts:30`) follows these steps:
+
+<Steps>
+  <Step title="Validation">
+    Employee data is validated against the contract type schema.
+  </Step>
+  
+  <Step title="PDF Generation">
+    Three PDFs are generated in parallel:
+    - Main employment contract
+    - Personal data processing consent
+    - Contract annexes
+  </Step>
+  
+  <Step title="Archive Creation">
+    PDFs are organized by contract type and packaged into a ZIP file.
+  </Step>
+  
+  <Step title="Streaming Response">
+    ZIP file is streamed directly to the client without saving to disk.
+  </Step>
+</Steps>
+
+```typescript
+// Simplified contract generation logic
+for (const emp of employee) {
+  const rootFolder = emp.contractType.toLowerCase().replace(/\s+/g, '');
+  
+  const [contractResult, processingOfPresonalDataPDF, anexoDocResult] =
+    await Promise.all([
+      this.pdfGeneratorService.generateContract(emp, emp.contractType, browser),
+      generateProcessingOfPresonalDataPDF(emp),
+      generateDocAnexo(emp, browser),
+    ]);
+
+  archive.append(contractResult.buffer, {
+    name: `${rootFolder}/${contractResult.filename}`,
+  });
+  archive.append(processingOfPresonalDataPDF, {
+    name: `${rootFolder}/Tratamiento de datos/${emp.dni}.pdf`,
+  });
+  archive.append(anexoDocResult, {
+    name: `${rootFolder}/Anexos/${emp.dni}.pdf`,
+  });
+}
+```
+
+## Data Validation
+
+All employee data is validated before contract generation. See the validation schema in `src/validators/employee.validator.ts:33`.
+
+### Common Validation Rules
+
+<CodeGroup>
+```typescript Name Fields
+name: z.string()
+  .min(2, 'Nombre debe tener al menos 2 letras')
+  .max(50, 'Nombre debe tener como maximo 50 letras')
+  .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'Nombre solo puede contener letras')
+```
+
+```typescript DNI
+dni: z.string()
+  .regex(/^\d{8}$/, 'DNI debe tener exactamente 8 dígitos numéricos')
+```
+
+```typescript Email
+email: z.email('El correo es requerido').trim()
+```
+
+```typescript Salary
+salary: z.number({ error: 'El salario debe ser un número válido' })
+  .refine((value) => value > 0, {
+    message: 'El sueldo debe ser mayor a 0',
+  })
+```
+
+```typescript Dates
+entryDate: z.union([
+  z.string().regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Fecha debe estar en formato DD/MM/YYYY'),
+  z.date(),
+])
+```
+</CodeGroup>
+
+## SUBSIDIO Contract Special Validation
+
+<Warning>
+  SUBSIDIO contracts require additional fields that are validated conditionally.
+</Warning>
+
+```typescript
+.superRefine((data, ctx) => {
+  if (data.contractType === 'Subsidio') {
+    if (!data.replacementFor) {
+      ctx.addIssue({
+        message: "El campo 'SUPLENCIA DE' es obligatorio para contratos de Subsidio",
+        path: ['replacementFor'],
+      });
+    }
+    if (!data.reasonForSubstitution) {
+      ctx.addIssue({
+        message: "El campo 'MOTIVO DE SUPLENCIA' es obligatorio para contratos de Subsidio",
+        path: ['reasonForSubstitution'],
+      });
+    }
+  }
+})
+```
+
+## Batch Size Limits
+
+<Note>
+  The API enforces batch size limits to prevent resource exhaustion.
+</Note>
+
+- **Minimum**: 1 employee
+- **Maximum**: 50 employees per request (configurable in validation schema)
+- **Recommended**: Keep batches under 20 employees for optimal performance
+
+```typescript
+export const EmployeeBatchSchema = z.object({
+  body: z.array(employeeSchema)
+    .min(1, 'Debes seleccionar al menos un empleado para generar el ZIP')
+    .max(50, 'Máximo 50 empleados por lote'),
+});
+```
+
+## Error Handling
+
+If contract generation fails for individual employees, the process continues for others:
+
+```typescript
+try {
+  // Generate contract PDFs
+} catch (error) {
+  if (error instanceof Error) {
+    logger.info(`Error con empleado ${emp.dni}: ${error.message}`);
+  }
+  // Continue with next employee
+}
+```
+
+See [Error Handling Guide](/guides/error-handling) for more details.
+
+## Complete Example
+
+### Generate Contracts for Multiple Employees
+
+```bash
+curl -X POST http://localhost:3000/api/contract/download-zip \
+  -H "Content-Type: application/json" \
+  -d '{
+    "body": [
+      {
+        "name": "Juan",
+        "lastNameFather": "Pérez",
+        "lastNameMother": "García",
+        "dni": "12345678",
+        "email": "juan.perez@example.com",
+        "birthDate": "15/03/1990",
+        "sex": "M",
+        "address": "Av. Principal 123",
+        "province": "Lima",
+        "district": "Miraflores",
+        "department": "Lima",
+        "salary": 3000,
+        "salaryInWords": "tres mil soles",
+        "position": "Analista",
+        "entryDate": "01/01/2024",
+        "endDate": "31/12/2024",
+        "subDivisionOrParking": "Sede Central",
+        "contractType": "Planilla"
+      },
+      {
+        "name": "María",
+        "lastNameFather": "López",
+        "lastNameMother": "Ruiz",
+        "dni": "87654321",
+        "email": "maria.lopez@example.com",
+        "birthDate": "20/07/1988",
+        "sex": "F",
+        "address": "Jr. Los Olivos 456",
+        "province": "Lima",
+        "district": "San Isidro",
+        "department": "Lima",
+        "salary": 2500,
+        "salaryInWords": "dos mil quinientos soles",
+        "position": "Asistente",
+        "entryDate": "15/02/2024",
+        "endDate": "31/08/2024",
+        "subDivisionOrParking": "Oficina Principal",
+        "contractType": "Subsidio",
+        "replacementFor": "Carlos Mendoza",
+        "reasonForSubstitution": "Vacaciones",
+        "timeForCompany": "6 meses",
+        "workingCondition": "Temporal",
+        "probationaryPeriod": "3 meses"
+      }
+    ]
+  }' \
+  --output contracts.zip
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Excel Upload" icon="file-excel" href="/guides/excel-upload">
+    Learn how to prepare Excel files for bulk upload
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Understand error responses and debugging
+  </Card>
+</CardGroup>

@@ -1,0 +1,710 @@
+---
+title: 'Error Handling'
+description: 'Learn how to handle API errors and debug common issues in Kontrak Backend'
+icon: 'triangle-exclamation'
+---
+
+## Overview
+
+Kontrak Backend uses structured error responses to help you identify and resolve issues quickly. All errors follow a consistent format and include detailed information for debugging.
+
+## Error Response Structure
+
+All API errors return a JSON response with the following structure:
+
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "data": {
+    // Additional error context (optional)
+  },
+  "errors": "Error details" // For internal errors
+}
+```
+
+## HTTP Status Codes
+
+The API uses standard HTTP status codes defined in `src/constants/http.ts`:
+
+| Status Code | Constant | Meaning | When Used |
+|-------------|----------|---------|----------|
+| 200 | `OK` | Success | Successful requests |
+| 201 | `CREATED` | Created | Resource created successfully |
+| 400 | `BAD_REQUEST` | Bad Request | Invalid input or validation errors |
+| 401 | `UNAUTHORIZED` | Unauthorized | Authentication required |
+| 403 | `FORBIDDEN` | Forbidden | Insufficient permissions |
+| 404 | `NOT_FOUND` | Not Found | Resource not found |
+| 409 | `CONFLICT` | Conflict | Resource conflict |
+| 422 | `UNPROCESSABLE_CONTENT` | Unprocessable | Semantic errors |
+| 429 | `TOO_MANY_REQUESTS` | Rate Limited | Too many requests |
+| 500 | `INTERNAL_SERVER_ERROR` | Server Error | Unexpected server error |
+
+## Error Types
+
+### Application Errors (AppError)
+
+Structured errors with specific status codes and context:
+
+```typescript
+export class AppError extends Error {
+  public readonly statusCode: number;
+  public readonly data: AppErrorContext | undefined;
+  
+  constructor(
+    message: string,
+    statusCode: HttpStatusCode,
+    data?: AppErrorContext,
+  ) {
+    super(message);
+    this.statusCode = statusCode;
+    this.data = data;
+  }
+}
+```
+
+**Example Usage:**
+```typescript
+throw new AppError(
+  'El archivo Excel no contiene datos válidos',
+  BAD_REQUEST
+);
+```
+
+### Validation Errors
+
+Validation errors include detailed information about which fields failed validation:
+
+```json
+{
+  "success": false,
+  "message": "No se pudo procesar el archivo. Se encontraron 3 errores.",
+  "data": {
+    "validationErrors": [
+      {
+        "row": 2,
+        "field": "dni",
+        "message": "DNI debe tener exactamente 8 dígitos numéricos."
+      },
+      {
+        "row": 3,
+        "field": "email",
+        "message": "Invalid email"
+      },
+      {
+        "row": 5,
+        "field": "salary",
+        "message": "El sueldo debe ser mayor a 0"
+      }
+    ]
+  }
+}
+```
+
+Source: `src/services/excel-parser.service.ts:58`
+
+```typescript
+const cleansErrors = validation.errors.map((err) => ({
+  row: err.row,
+  field: err.field,
+  message: err.error.message,
+}));
+
+throw new AppError(
+  `No se pudo procesar el archivo. Se encontraron ${validation.errors.length} errores.`,
+  BAD_REQUEST,
+  { validationErrors: cleansErrors },
+);
+```
+
+### File Upload Errors (Multer)
+
+File upload errors are handled by the Multer middleware (`src/middlewares/error-handler-multer.middleware.ts`):
+
+<AccordionGroup>
+  <Accordion title="LIMIT_FILE_SIZE">
+    **Status Code:** 400
+    
+    **Response:**
+    ```json
+    {
+      "success": false,
+      "message": "El archivo es demasiado grande. Tamaño máximo: 10 MB"
+    }
+    ```
+    
+    **Solution:**
+    - Reduce file size
+    - Split data into multiple files
+    - Increase `MAX_FILE_SIZE` in configuration
+  </Accordion>
+  
+  <Accordion title="LIMIT_FILE_COUNT">
+    **Status Code:** 400
+    
+    **Response:**
+    ```json
+    {
+      "success": false,
+      "message": "Solo puedes subir 1 archivo a la vez"
+    }
+    ```
+    
+    **Solution:**
+    - Upload one file at a time
+    - Combine data into single Excel file
+  </Accordion>
+  
+  <Accordion title="LIMIT_UNEXPECTED_FILE">
+    **Status Code:** 400
+    
+    **Response:**
+    ```json
+    {
+      "success": false,
+      "message": "Campo de archivo inesperado. Usa el campo 'excel'"
+    }
+    ```
+    
+    **Solution:**
+    - Use field name `excel` for file upload
+    - Check multipart form field name
+  </Accordion>
+  
+  <Accordion title="Invalid File Type">
+    **Status Code:** 400
+    
+    **Response:**
+    ```json
+    {
+      "success": false,
+      "message": "Tipo de archivo no permitido"
+    }
+    ```
+    
+    **Solution:**
+    - Use .xlsx file format
+    - Convert .xls files to .xlsx
+    - Ensure proper MIME type
+  </Accordion>
+</AccordionGroup>
+
+## Common Error Scenarios
+
+### Excel File Errors
+
+<Tabs>
+  <Tab title="Missing Headers">
+    **Error:**
+    ```json
+    {
+      "success": false,
+      "message": "La estructura del archivo es incorrecta. Faltan columnas obligatorias.",
+      "data": {
+        "validationErrors": [
+          {
+            "row": 1,
+            "field": "dni",
+            "message": "Encabezado requerido no encontrado en el archivo."
+          }
+        ]
+      }
+    }
+    ```
+    
+    **Debugging Steps:**
+    1. Check first row contains headers
+    2. Verify header spelling matches accepted aliases
+    3. Remove extra spaces in header names
+    4. Check for special characters in headers
+    
+    **Solution:**
+    - Add missing column headers
+    - Use one of the accepted aliases from field configuration
+    - See [Excel Upload Guide](/guides/excel-upload) for valid headers
+  </Tab>
+  
+  <Tab title="Corrupt File">
+    **Error:**
+    ```json
+    {
+      "success": false,
+      "message": "El archivo Excel está corrupto o no es un archivo válido"
+    }
+    ```
+    
+    **Debugging Steps:**
+    1. Try opening file in Excel
+    2. Check file extension (.xlsx)
+    3. Look for file corruption indicators
+    4. Verify file wasn't truncated during transfer
+    
+    **Solution:**
+    - Re-save file in Excel as .xlsx
+    - Remove macros and VBA code
+    - Create new file and copy data
+  </Tab>
+  
+  <Tab title="Empty File">
+    **Error:**
+    ```json
+    {
+      "success": false,
+      "message": "El archivo Excel no contiene datos válidos"
+    }
+    ```
+    
+    **Debugging Steps:**
+    1. Verify data exists after header row
+    2. Check for hidden rows
+    3. Ensure worksheet is not empty
+    4. Check if correct sheet is being read
+    
+    **Solution:**
+    - Add data rows starting from row 2
+    - Unhide any hidden rows
+    - Ensure data is in first sheet
+  </Tab>
+</Tabs>
+
+### Validation Errors
+
+<Tabs>
+  <Tab title="DNI Validation">
+    **Common Errors:**
+    ```json
+    {
+      "row": 2,
+      "field": "dni",
+      "message": "DNI debe tener exactamente 8 dígitos numéricos."
+    }
+    ```
+    
+    **Validation Rule:**
+    ```typescript
+    dni: z.string()
+      .regex(/^\d{8}$/, 'DNI debe tener exactamente 8 dígitos numéricos')
+    ```
+    
+    **Valid Examples:**
+    - ✅ `12345678`
+    - ✅ `87654321`
+    
+    **Invalid Examples:**
+    - ❌ `1234567` (too short)
+    - ❌ `123456789` (too long)
+    - ❌ `12-345-678` (contains dashes)
+    - ❌ `12.345.678` (contains dots)
+  </Tab>
+  
+  <Tab title="Email Validation">
+    **Common Errors:**
+    ```json
+    {
+      "row": 3,
+      "field": "email",
+      "message": "Invalid email"
+    }
+    ```
+    
+    **Validation Rule:**
+    ```typescript
+    email: z.email('El correo es requerido').trim()
+    ```
+    
+    **Valid Examples:**
+    - ✅ `user@example.com`
+    - ✅ `juan.perez@company.com.pe`
+    
+    **Invalid Examples:**
+    - ❌ `user@` (incomplete)
+    - ❌ `@example.com` (missing local part)
+    - ❌ `user.example.com` (missing @)
+  </Tab>
+  
+  <Tab title="Salary Validation">
+    **Common Errors:**
+    ```json
+    {
+      "row": 5,
+      "field": "salary",
+      "message": "El sueldo debe ser mayor a 0"
+    }
+    ```
+    
+    **Validation Rule:**
+    ```typescript
+    salary: z.number()
+      .refine((value) => value > 0, {
+        message: 'El sueldo debe ser mayor a 0',
+      })
+    ```
+    
+    **Valid Examples:**
+    - ✅ `3000`
+    - ✅ `3000.50`
+    - ✅ `S/. 3000` (text format)
+    
+    **Invalid Examples:**
+    - ❌ `0`
+    - ❌ `-1000`
+    - ❌ `N/A`
+    - ❌ Empty cell
+  </Tab>
+  
+  <Tab title="Date Validation">
+    **Common Errors:**
+    ```json
+    {
+      "row": 4,
+      "field": "entryDate",
+      "message": "Fecha debe estar en formato DD/MM/YYYY"
+    }
+    ```
+    
+    **Validation Rule:**
+    ```typescript
+    entryDate: z.union([
+      z.string().regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Fecha debe estar en formato DD/MM/YYYY'),
+      z.date(),
+    ])
+    ```
+    
+    **Valid Examples:**
+    - ✅ `01/01/2024`
+    - ✅ `15/03/1990`
+    - ✅ Excel date cell
+    
+    **Invalid Examples:**
+    - ❌ `1/1/2024` (missing leading zeros)
+    - ❌ `2024-01-01` (wrong format)
+    - ❌ `01-01-2024` (wrong separator)
+  </Tab>
+</Tabs>
+
+### Contract Type Errors
+
+<Warning>
+  SUBSIDIO contracts require additional fields that must be provided.
+</Warning>
+
+```json
+{
+  "row": 6,
+  "field": "replacementFor",
+  "message": "El campo 'SUPLENCIA DE' es obligatorio para contratos de Subsidio"
+}
+```
+
+**Conditional Validation (src/validators/employee.validator.ts:142):**
+```typescript
+.superRefine((data, ctx) => {
+  if (data.contractType === 'Subsidio') {
+    if (!data.replacementFor) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El campo 'SUPLENCIA DE' es obligatorio para contratos de Subsidio",
+        path: ['replacementFor'],
+      });
+    }
+    if (!data.reasonForSubstitution) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El campo 'MOTIVO DE SUPLENCIA' es obligatorio para contratos de Subsidio",
+        path: ['reasonForSubstitution'],
+      });
+    }
+  }
+})
+```
+
+**Solution:**
+- Provide all required SUBSIDIO fields
+- See [Generating Contracts Guide](/guides/generating-contracts)
+
+### Session and Resource Errors
+
+<Tabs>
+  <Tab title="Session Not Found">
+    **Error:**
+    ```json
+    {
+      "success": false,
+      "message": "Sesión no encontrada: abc123",
+      "data": null
+    }
+    ```
+    
+    **Status Code:** 404
+    
+    **Causes:**
+    - Session expired or cleaned up
+    - Invalid session ID
+    - Session directory deleted
+    
+    **Solution:**
+    - Re-upload Excel file to create new session
+    - Check `FILE_CLEANUP_TIMEOUT` configuration
+    - Verify session ID is correct
+  </Tab>
+  
+  <Tab title="PDF Not Found">
+    **Error:**
+    ```json
+    {
+      "success": false,
+      "message": "PDF no encontrado para el DNI: 12345678",
+      "data": null
+    }
+    ```
+    
+    **Status Code:** 404
+    
+    **Causes:**
+    - PDF not yet generated
+    - Wrong DNI provided
+    - Session directory missing
+    
+    **Solution:**
+    - Verify employee exists in session
+    - Check DNI is correct
+    - Generate contracts first
+  </Tab>
+</Tabs>
+
+## Error Handler Middleware
+
+The global error handler (`src/middlewares/error-handle.middleware.ts`) catches all errors:
+
+```typescript
+export const errorHandler: ErrorRequestHandler = (
+  error,
+  _req: Request,
+  res,
+  _next: NextFunction,
+) => {
+  if (error instanceof AppError) {
+    handlerAppError(res, error);
+    return;
+  }
+  
+  logger.error(`${error.stack || error.message}`);
+  res.status(INTERNAL_SERVER_ERROR).json({
+    success: false,
+    message: 'Internal Server Error',
+    errors: error.message,
+  });
+};
+```
+
+### AppError Handling
+
+```typescript
+const handlerAppError = (res: Response, error: AppError) => {
+  res.status(error.statusCode).json({
+    success: false,
+    message: error.message,
+    data: error.data || null,
+  });
+};
+```
+
+## Debugging Tips
+
+<Steps>
+  <Step title="Check Error Response">
+    Read the error message and status code:
+    
+    ```bash
+    curl -X POST http://localhost:3000/api/excel/upload \
+      -F "excel=@test.xlsx" \
+      -v
+    ```
+    
+    Look for:
+    - HTTP status code in response headers
+    - `success: false` in JSON body
+    - `message` field with error description
+    - `data` field with additional context
+  </Step>
+  
+  <Step title="Review Server Logs">
+    Check server console for detailed error information:
+    
+    ```bash
+    # Look for error logs
+    tail -f logs/app.log
+    ```
+    
+    The logger outputs:
+    - Error stack traces
+    - Validation details
+    - File processing steps
+    - CORS blocking messages
+  </Step>
+  
+  <Step title="Validate Input Data">
+    Verify your input matches expected format:
+    
+    - Excel files: Check headers and data types
+    - JSON requests: Validate against schema
+    - File uploads: Verify size and format
+    - Dates: Use DD/MM/YYYY format
+  </Step>
+  
+  <Step title="Test with Minimal Data">
+    Isolate the issue with minimal test case:
+    
+    ```bash
+    # Test with single employee
+    curl -X POST http://localhost:3000/api/contract/download-zip \
+      -H "Content-Type: application/json" \
+      -d '{"body": [/* single employee */]}'
+    ```
+  </Step>
+  
+  <Step title="Check Configuration">
+    Verify environment configuration:
+    
+    ```bash
+    # Check configuration is loaded
+    cat .env
+    
+    # Verify temp directory exists
+    ls -la temp/
+    
+    # Check file permissions
+    ls -la temp/
+    ```
+  </Step>
+</Steps>
+
+## Error Prevention
+
+<CardGroup cols={2}>
+  <Card title="Input Validation" icon="shield-check">
+    - Validate data before upload
+    - Use provided Excel templates
+    - Check required fields are present
+    - Test with small batches first
+  </Card>
+  
+  <Card title="File Preparation" icon="file-check">
+    - Use .xlsx format
+    - Keep files under size limit
+    - Remove unnecessary formatting
+    - Verify headers match aliases
+  </Card>
+  
+  <Card title="API Usage" icon="code">
+    - Check response status codes
+    - Handle errors gracefully
+    - Implement retry logic for transient errors
+    - Log errors for debugging
+  </Card>
+  
+  <Card title="Configuration" icon="gear">
+    - Set appropriate file size limits
+    - Configure CORS correctly
+    - Monitor disk space for temp files
+    - Set reasonable timeouts
+  </Card>
+</CardGroup>
+
+## HTTP Client Error Handling Examples
+
+<CodeGroup>
+```javascript JavaScript (fetch)
+const uploadExcel = async (file) => {
+  const formData = new FormData();
+  formData.append('excel', file);
+  
+  try {
+    const response = await fetch('http://localhost:3000/api/excel/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      // Handle validation errors
+      if (data.data?.validationErrors) {
+        console.error('Validation errors:', data.data.validationErrors);
+        // Display errors to user
+      } else {
+        console.error('Error:', data.message);
+      }
+      throw new Error(data.message);
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error('Upload failed:', error);
+    throw error;
+  }
+};
+```
+
+```python Python (requests)
+import requests
+
+def upload_excel(file_path):
+    url = 'http://localhost:3000/api/excel/upload'
+    
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'excel': f}
+            response = requests.post(url, files=files)
+        
+        data = response.json()
+        
+        if not data.get('success'):
+            # Handle validation errors
+            if 'validationErrors' in data.get('data', {}):
+                for error in data['data']['validationErrors']:
+                    print(f"Row {error['row']}, {error['field']}: {error['message']}")
+            else:
+                print(f"Error: {data.get('message')}")
+            raise Exception(data.get('message'))
+        
+        return data['data']
+    
+    except requests.exceptions.RequestException as e:
+        print(f"Upload failed: {e}")
+        raise
+```
+
+```bash cURL
+#!/bin/bash
+
+# Upload with error handling
+response=$(curl -X POST http://localhost:3000/api/excel/upload \
+  -F "excel=@employees.xlsx" \
+  -w "\n%{http_code}" \
+  -s)
+
+# Extract status code
+status_code=$(echo "$response" | tail -n1)
+body=$(echo "$response" | sed '$d')
+
+if [ "$status_code" != "200" ]; then
+  echo "Error: HTTP $status_code"
+  echo "Response: $body"
+  exit 1
+fi
+
+echo "Success: $body"
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure error handling and logging
+  </Card>
+  <Card title="Excel Upload" icon="file-excel" href="/guides/excel-upload">
+    Learn proper Excel file format
+  </Card>
+</CardGroup>

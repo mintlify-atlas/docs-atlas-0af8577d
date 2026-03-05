@@ -1,0 +1,254 @@
+---
+title: Download SCTR Excel
+description: Generate an Excel file in SCTR insurance format
+---
+
+## Endpoint
+
+<api method="POST" url="/api/excel/download-sctr" />
+
+Generates an Excel file containing employee data formatted for SCTR (Seguro Complementario de Trabajo de Riesgo) insurance submission. The response is a downloadable Excel file with standardized columns required by the insurance provider.
+
+## Request
+
+### Headers
+
+```json
+{
+  "Content-Type": "application/json"
+}
+```
+
+### Body Parameters
+
+<ParamField body="body" type="array" required>
+  Array of employee objects to include in the Excel file
+  
+  <Expandable title="Employee object properties">
+    <ParamField body="name" type="string" required>
+      Employee's first name
+    </ParamField>
+    
+    <ParamField body="lastNameFather" type="string" required>
+      Father's last name
+    </ParamField>
+    
+    <ParamField body="lastNameMother" type="string" required>
+      Mother's last name
+    </ParamField>
+    
+    <ParamField body="dni" type="string" required>
+      8-digit DNI
+    </ParamField>
+    
+    <ParamField body="position" type="string" required>
+      Job position
+    </ParamField>
+    
+    <ParamField body="salary" type="number" required>
+      Salary amount
+    </ParamField>
+    
+    <ParamField body="sex" type="string" required>
+      Gender (M/F)
+    </ParamField>
+    
+    <ParamField body="entryDate" type="string" required>
+      Start date in DD/MM/YYYY format or Date object
+    </ParamField>
+    
+    <ParamField body="birthDate" type="string" optional>
+      Birth date in DD/MM/YYYY format or Date object
+    </ParamField>
+    
+    <ParamField body="endDate" type="string" optional>
+      End date in DD/MM/YYYY format or Date object
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+Returns an Excel file (.xlsx) with the following headers:
+
+| Column | Description | Format |
+|--------|-------------|--------|
+| Item | Sequential number | Number |
+| Apellido Paterno | Father's last name | Text |
+| Apellido Materno | Mother's last name | Text |
+| Nombres | First name | Text |
+| Sexo | Gender | M/F |
+| Fecha Nac. | Birth date | Excel serial date |
+| Nacionalidad | Nationality | Always "PERUANA" |
+| Tipo Doc. | Document type | Always "DNI" |
+| Numero Doc. | Document number | Text |
+| DC | Verification digit | Empty (to be filled) |
+| Condición | Employee condition | Always "P" (Permanent) |
+| Cargo | Position | Text |
+| Moneda Sueldo | Currency | Always "SOLES" |
+| Sueldo | Salary | Formatted currency |
+| Tasa | Risk rate | Always "ALTO RIESGO" |
+| Fecha Ingreso | Entry date | Excel serial date |
+| Fecha cese | End date | Excel serial date |
+| Cod/Cliente | Client code | Empty (to be filled) |
+| Sede | Headquarters | Always "PLAYA" |
+
+### Response Headers
+
+```
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+Content-Disposition: attachment; filename=FORMATO_SCTR.xlsx
+Content-Length: [file size in bytes]
+```
+
+## Example
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.kontrak.com/api/excel/download-sctr \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "name": "Juan",
+      "lastNameFather": "Pérez",
+      "lastNameMother": "García",
+      "dni": "12345678",
+      "position": "Operario",
+      "salary": 1500,
+      "sex": "M",
+      "entryDate": "01/03/2024",
+      "birthDate": "15/06/1990",
+      "endDate": "31/12/2024"
+    },
+    {
+      "name": "María",
+      "lastNameFather": "López",
+      "lastNameMother": "Martínez",
+      "dni": "87654321",
+      "position": "Supervisor",
+      "salary": 2500,
+      "sex": "F",
+      "entryDate": "15/02/2024",
+      "birthDate": "22/08/1988",
+      "endDate": "31/12/2024"
+    }
+  ]' \
+  --output FORMATO_SCTR.xlsx
+```
+
+```javascript JavaScript
+const employees = [
+  {
+    name: "Juan",
+    lastNameFather: "Pérez",
+    lastNameMother: "García",
+    dni: "12345678",
+    position: "Operario",
+    salary: 1500,
+    sex: "M",
+    entryDate: "01/03/2024",
+    birthDate: "15/06/1990",
+    endDate: "31/12/2024"
+  }
+];
+
+const response = await fetch('https://api.kontrak.com/api/excel/download-sctr', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(employees)
+});
+
+const blob = await response.blob();
+const url = window.URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'FORMATO_SCTR.xlsx';
+document.body.appendChild(a);
+a.click();
+window.URL.revokeObjectURL(url);
+```
+
+```python Python
+import requests
+
+employees = [
+    {
+        "name": "Juan",
+        "lastNameFather": "Pérez",
+        "lastNameMother": "García",
+        "dni": "12345678",
+        "position": "Operario",
+        "salary": 1500,
+        "sex": "M",
+        "entryDate": "01/03/2024",
+        "birthDate": "15/06/1990",
+        "endDate": "31/12/2024"
+    }
+]
+
+response = requests.post(
+    'https://api.kontrak.com/api/excel/download-sctr',
+    json=employees
+)
+
+with open('FORMATO_SCTR.xlsx', 'wb') as f:
+    f.write(response.content)
+```
+</CodeGroup>
+
+## Error Responses
+
+### Empty Request Body
+
+```json
+{
+  "success": false,
+  "message": "No se recibieron datos. Debes enviar una lista de empleados."
+}
+```
+
+### Too Many Employees
+
+```json
+{
+  "success": false,
+  "message": "Máximo 80 empleados por lote"
+}
+```
+
+### Validation Error
+
+```json
+{
+  "success": false,
+  "message": "Validation error",
+  "errors": [
+    {
+      "field": "sex",
+      "message": "El genero es requerido."
+    },
+    {
+      "field": "dni",
+      "message": "DNI debe tener exactamente 8 dígitos numéricos."
+    }
+  ]
+}
+```
+
+## Notes
+
+- The generated file includes centered headers in the first row
+- Dates are converted to Excel serial date format for compatibility
+- Nationality is always set to "PERUANA"
+- Document type is always set to "DNI"
+- Currency is always set to "SOLES"
+- Condition is always set to "P" (Permanent)
+- Risk rate is always set to "ALTO RIESGO" (High Risk)
+- Headquarters is always set to "PLAYA"
+- DC (verification digit) field is left empty for manual completion
+- Client code field is left empty for manual completion
+- Salary is formatted with currency symbols (S/.)
+- Minimum 1 employee required, maximum 50 employees per batch
+- File name is always `FORMATO_SCTR.xlsx`

@@ -1,0 +1,288 @@
+---
+title: "Contract Types"
+description: "Understanding the three contract types supported by Kontrak Backend: PLANILLA, SUBSIDIO, and PART TIME"
+icon: "file-contract"
+---
+
+## Overview
+
+Kontrak Backend supports three distinct contract types, each designed for different employment scenarios. Each contract type has specific requirements, fields, and use cases.
+
+## Contract Type Definition
+
+The contract type is defined as a TypeScript union type:
+
+```typescript src/types/employees.interface.ts
+export type ContractType = 'PLANILLA' | 'SUBSIDIO' | 'PART TIME';
+```
+
+This type is used throughout the system to ensure type safety and consistent contract handling.
+
+## Contract Types
+
+<Tabs>
+  <Tab title="PLANILLA">
+    ### Full-Time Employment Contract
+
+    **PLANILLA** is the standard full-time employment contract with all legal benefits required by law.
+
+    #### When to Use
+    - Permanent full-time employees
+    - Staff entitled to full legal benefits
+    - Long-term employment relationships
+    - Positions requiring complete benefit packages
+
+    #### Required Fields
+    
+    <Info>
+      PLANILLA contracts require all base employee information plus standard employment details.
+    </Info>
+
+    ```typescript
+    requiredFields: [
+      // Base Information
+      'name',
+      'lastNameFather',
+      'lastNameMother',
+      'dni',
+      'entryDate',
+      'endDate',
+      'position',
+      'subDivisionOrParking',
+      
+      // Location Information
+      'province',
+      'district',
+      'department',
+      'address',
+      
+      // Compensation
+      'salary',
+      'salaryInWords'
+    ]
+    ```
+
+    #### Key Characteristics
+    - Full legal benefits and protections
+    - Standard probationary period applies
+    - Complete social security coverage
+    - Eligible for all company benefits
+
+    #### Template Generation
+    
+    The PLANILLA contract uses the `generatePlanillaContract()` function which renders a full-time employment template with:
+    - Complete employee information
+    - Formatted salary display
+    - Probationary period clause
+    - Digital signatures from both employers
+    - Letter format (8.5" x 11") with custom margins
+
+  </Tab>
+  
+  <Tab title="SUBSIDIO">
+    ### Temporary Replacement Contract
+
+    **SUBSIDIO** is a temporary contract used when an employee temporarily replaces another employee who is absent.
+
+    #### When to Use
+    - Temporary replacement for absent employees
+    - Coverage during medical leave, vacation, or other absences
+    - Short-term substitution needs
+    - Positions with defined replacement duration
+
+    #### Required Fields
+
+    <Note>
+      SUBSIDIO contracts require all PLANILLA fields PLUS specific replacement information.
+    </Note>
+
+    ```typescript
+    requiredFields: [
+      // All PLANILLA fields, plus:
+      'replacementFor',          // Name of employee being replaced
+      'reasonForSubstitution'    // Reason for the replacement
+    ]
+    ```
+
+    #### Additional Optional Fields
+    - `timeForCompany`: How long the replacement employee has been with the company
+    - `workingCondition`: Specific working conditions for the replacement
+    - `probationaryPeriod`: Trial period for the replacement position
+
+    #### Key Characteristics
+    - Temporary nature with specific end date
+    - Tied to another employee's absence
+    - Must specify who is being replaced and why
+    - Same legal protections as PLANILLA during contract period
+
+    #### Template Generation
+
+    The SUBSIDIO contract uses the `generateSubsidioContract()` function which includes:
+    - Replacement employee's full information
+    - Name of person being replaced (split into components)
+    - Reason for substitution
+    - Formatted salary with currency
+    - Special formatting for replacement context
+
+    ```typescript src/template/contracts.ts
+    // Name formatting example
+    const replacementForArray = data.replacementFor?.split(' ');
+    const firstAndfirstLastName = `${replacementForArray?.[0] || ''} ${replacementForArray?.[1] || ''}`;
+    const secondLastName = `${replacementForArray?.[2] || ''}`;
+    ```
+
+  </Tab>
+  
+  <Tab title="PART TIME">
+    ### Part-Time Employment Contract
+
+    **PART TIME** is a contract for employees working reduced hours compared to full-time positions.
+
+    #### When to Use
+    - Part-time employees working reduced schedules
+    - Flexible work arrangements
+    - Positions not requiring full-time commitment
+    - Employees with proportional benefits
+
+    #### Required Fields
+
+    <Info>
+      PART TIME contracts use the same base fields as PLANILLA, without SUBSIDIO-specific requirements.
+    </Info>
+
+    ```typescript
+    requiredFields: [
+      // Base Information
+      'name',
+      'lastNameFather',
+      'lastNameMother',
+      'dni',
+      'entryDate',
+      'endDate',
+      'position',
+      'subDivisionOrParking',
+      
+      // Location Information
+      'province',
+      'district',
+      'department',
+      'address',
+      
+      // Compensation
+      'salary',
+      'salaryInWords'
+    ]
+    ```
+
+    #### Key Characteristics
+    - Reduced working hours
+    - Proportional benefits based on hours worked
+    - Flexible scheduling arrangements
+    - Pro-rated compensation and benefits
+
+    #### Template Generation
+
+    The PART TIME contract uses the `generatePartTimeContract()` function which creates:
+    - Part-time specific employment terms
+    - Clearly formatted employee information
+    - Email included for communication
+    - Subdivision/parking assignment details
+    - Letter format with optimized margins for part-time agreements
+
+  </Tab>
+</Tabs>
+
+## Contract Type Validation
+
+The system validates contract types during Excel import and employee creation:
+
+```typescript src/services/validation.service.ts
+private mapContractType(tipo: string): ContractType {
+  const normalized = tipo.trim();
+  const lower = normalized.toLowerCase();
+
+  if (lower === 'planilla') return 'PLANILLA';
+  if (lower === 'subsidio') return 'SUBSIDIO';
+  if (lower === 'part-time' || lower === 'part_time' || lower === 'part time')
+    return 'PART TIME';
+
+  return 'PLANILLA'; // Default fallback
+}
+```
+
+<Warning>
+  If an invalid contract type is provided in an Excel file, the row will be skipped during processing.
+</Warning>
+
+## Contract Type in Excel Files
+
+When importing employees via Excel, the contract type column can use various aliases:
+
+```typescript src/constants/contract-field.ts
+contractType: {
+  aliases: [
+    'tipo de contrato',
+    'Tipo Contrato',
+    'tipodecontrato',
+    'tipo_de_contrato',
+    'tipo contrato',
+    'TIPO DE CONTRATO'
+  ],
+  description: 'Tipo de contrato del empleado'
+}
+```
+
+## Selecting the Right Contract Type
+
+<Accordion title="Decision Guide">
+  <AccordionItem title="Use PLANILLA when...">
+    - The employee is hired for a permanent position
+    - Full-time work schedule is required
+    - Complete legal benefits must be provided
+    - The position is long-term or indefinite
+  </AccordionItem>
+  
+  <AccordionItem title="Use SUBSIDIO when...">
+    - An existing employee is temporarily absent
+    - You need to cover a specific person's duties
+    - The employment duration is tied to someone's leave
+    - You must document who is being replaced and why
+  </AccordionItem>
+  
+  <AccordionItem title="Use PART TIME when...">
+    - The position requires less than full-time hours
+    - Flexible scheduling is needed
+    - Proportional benefits are appropriate
+    - The employee works a reduced schedule
+  </AccordionItem>
+</Accordion>
+
+## Contract Data Interface
+
+When contracts are generated and stored, they use the following interface:
+
+```typescript src/types/employees.interface.ts
+export interface ContractData {
+  emplooyeeDni: string;      // Employee's DNI
+  fileName: string;           // Generated PDF filename
+  buffer: Buffer;             // PDF file binary data
+  contractType: ContractType; // Type of contract
+}
+```
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Employee Data Structure" icon="users" href="/concepts/employee-data">
+    Learn about the complete employee data interface
+  </Card>
+  <Card title="PDF Generation" icon="file-pdf" href="/concepts/pdf-generation">
+    Understand how contracts are rendered as PDFs
+  </Card>
+  <Card title="Excel Processing" icon="file-excel" href="/concepts/excel-processing">
+    See how contract types are validated in Excel imports
+  </Card>
+  <Card title="API Endpoints" icon="code" href="/api/contracts/download-zip">
+    Use the API to generate contracts
+  </Card>
+</CardGroup>

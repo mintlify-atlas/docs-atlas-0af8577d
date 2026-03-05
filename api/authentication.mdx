@@ -1,0 +1,313 @@
+---
+title: 'Authentication'
+description: 'Security and authentication guidelines for the Kontrak Backend API'
+---
+
+## Current Authentication Status
+
+<Warning>
+  **No Authentication Implemented**: The Kontrak API currently does not implement any authentication or authorization mechanism. All endpoints are publicly accessible without credentials.
+</Warning>
+
+The API is designed for internal use and assumes a trusted network environment. Before deploying to production or exposing the API to external networks, **authentication must be implemented**.
+
+## Security Considerations
+
+### Current Security Measures
+
+The API currently implements the following security features:
+
+1. **CORS Protection**: Only configured origins can access the API
+2. **File Upload Validation**: Strict validation of file types and sizes
+3. **Request Validation**: Zod schema validation for request payloads
+4. **Error Handling**: Secure error responses that don't expose sensitive information
+
+### Missing Security Features
+
+The following security features are **not currently implemented** but are recommended for production:
+
+- Authentication (JWT, API Keys, OAuth)
+- Authorization and role-based access control
+- Rate limiting
+- Request signing
+- IP whitelisting
+- Audit logging
+
+## Recommended Authentication Approach
+
+For production deployment, we recommend implementing **JWT (JSON Web Token)** authentication:
+
+### 1. JWT Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    
+    Client->>Auth: POST /auth/login (credentials)
+    Auth->>Client: JWT Token
+    Client->>API: Request + Authorization Header
+    API->>API: Verify JWT
+    API->>Client: Response
+```
+
+### 2. Implementation Example
+
+Here's how you would authenticate requests once JWT is implemented:
+
+#### Login Request
+
+```bash
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "user@example.com",
+  "password": "your-password"
+}
+```
+
+#### Login Response
+
+```json
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 3600
+}
+```
+
+#### Authenticated Request
+
+```bash
+POST /api/contracts/download-zip
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "employees": [...]
+}
+```
+
+<Note>
+  The above examples show the **recommended** authentication flow. This is not currently implemented in the API.
+</Note>
+
+## Required Headers
+
+Currently, API requests require the following headers:
+
+### Standard Requests (JSON)
+
+```bash
+Content-Type: application/json
+```
+
+### File Upload Requests
+
+For endpoints that accept file uploads (`/api/excel/upload`, `/api/addendum/upload`):
+
+```bash
+Content-Type: multipart/form-data
+```
+
+The file should be sent in a form field named `excel`.
+
+**Example using cURL:**
+
+```bash
+curl -X POST http://localhost:3000/api/excel/upload \
+  -F "excel=@employee-data.xlsx"
+```
+
+**Example using JavaScript Fetch:**
+
+```javascript
+const formData = new FormData();
+formData.append('excel', fileInput.files[0]);
+
+fetch('http://localhost:3000/api/excel/upload', {
+  method: 'POST',
+  body: formData
+})
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+## CORS and Origin Restrictions
+
+The API implements CORS (Cross-Origin Resource Sharing) to control which domains can access the API.
+
+### Configuring Allowed Origins
+
+Allowed origins are configured via the `CORS_ORIGINS` environment variable:
+
+```bash
+# .env file
+CORS_ORIGINS=http://localhost:5173,https://app.example.com,https://admin.example.com
+```
+
+### Allowed Methods
+
+The following HTTP methods are permitted:
+
+- `GET`
+- `POST`
+- `PUT`
+- `DELETE`
+- `PATCH`
+
+<Warning>
+  Requests from origins not in the whitelist will be blocked with a CORS error.
+</Warning>
+
+## Security Best Practices
+
+When deploying the Kontrak API to production, follow these security best practices:
+
+### 1. Implement Authentication
+
+<Card title="Priority: Critical" icon="exclamation-triangle">
+  Add JWT or API key authentication before exposing the API to external networks.
+</Card>
+
+**Recommended packages:**
+- `jsonwebtoken` for JWT generation and verification
+- `bcrypt` for password hashing
+- `express-rate-limit` for rate limiting
+
+### 2. Use HTTPS
+
+Always use HTTPS in production to encrypt data in transit:
+
+```bash
+# Use a reverse proxy like nginx
+https://api.yourdomain.com/api
+```
+
+### 3. Environment Variables
+
+Never commit sensitive configuration to version control:
+
+```bash
+# .env (DO NOT COMMIT)
+JWT_SECRET=your-secret-key-here
+CORS_ORIGINS=https://trusted-origin.com
+MAX_FILE_SIZE=10485760
+```
+
+### 4. Rate Limiting
+
+Implement rate limiting to prevent abuse:
+
+```javascript
+// Example using express-rate-limit
+import rateLimit from 'express-rate-limit';
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+
+app.use('/api/', limiter);
+```
+
+### 5. Input Validation
+
+The API already implements Zod schema validation for request payloads. Ensure all endpoints validate input data:
+
+```typescript
+// Current implementation in src/middlewares/schema-validator.middleware.ts
+schemaValidatorMiddleware(EmployeeBatchSchema)
+```
+
+### 6. File Upload Security
+
+The API currently validates:
+- File extensions (`.xlsx`, `.xls`, `.csv`)
+- MIME types
+- File size limits (10 MB default)
+
+**Additional recommendations:**
+- Scan uploaded files for malware
+- Store files outside the web root
+- Use unique filenames to prevent overwrites
+
+### 7. Error Messages
+
+Avoid exposing sensitive information in error messages. The API currently returns sanitized errors:
+
+```json
+{
+  "success": false,
+  "message": "Internal Server Error"
+}
+```
+
+<Note>
+  Stack traces and detailed errors should only be logged server-side, not sent to clients.
+</Note>
+
+## Network Security
+
+### Internal Network Deployment
+
+If deploying within a private network:
+
+1. Use firewall rules to restrict access
+2. Implement IP whitelisting
+3. Use VPN for external access
+4. Monitor access logs
+
+### Public Network Deployment
+
+If exposing to the internet:
+
+1. **Implement authentication** (critical)
+2. Use API gateway (AWS API Gateway, Kong, etc.)
+3. Enable rate limiting
+4. Use DDoS protection (Cloudflare, AWS Shield)
+5. Implement audit logging
+6. Use WAF (Web Application Firewall)
+
+## Audit Logging
+
+For production deployments, implement audit logging to track:
+
+- Authentication attempts
+- File uploads
+- Contract generations
+- Failed requests
+- Error events
+
+The API currently uses `pino` logger for basic logging (see `src/utils/logger`).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Overview" icon="book" href="/api/overview">
+    Return to API overview
+  </Card>
+  
+  <Card title="Contract Endpoints" icon="file-contract" href="/api/contracts/download-zip">
+    Explore contract endpoints
+  </Card>
+</CardGroup>
+
+## Implementation Checklist
+
+Before deploying to production:
+
+- [ ] Implement JWT authentication
+- [ ] Add authorization middleware
+- [ ] Enable rate limiting
+- [ ] Configure HTTPS
+- [ ] Set up environment variables securely
+- [ ] Implement audit logging
+- [ ] Configure firewall rules
+- [ ] Set up monitoring and alerts
+- [ ] Review and restrict CORS origins
+- [ ] Enable security headers (helmet.js)
+- [ ] Implement API versioning strategy
+- [ ] Set up backup and disaster recovery
