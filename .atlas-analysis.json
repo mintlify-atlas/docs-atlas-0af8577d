@@ -1,0 +1,99 @@
+{
+  "projectType": "api-service",
+  "projectName": "Kontrak Backend",
+  "projectDescription": "Automated contract generation system for employees with PDF creation, Excel processing, and document management capabilities.",
+  "theme": "aspen",
+  "primaryColor": "#2563eb",
+  "lightColor": "#60a5fa",
+  "darkColor": "#1e40af",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/contract-types",
+              "concepts/employee-data",
+              "concepts/pdf-generation",
+              "concepts/excel-processing"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/configuration",
+              "guides/generating-contracts",
+              "guides/excel-upload",
+              "guides/addendum-processing",
+              "guides/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Contracts",
+            "pages": [
+              "api/contracts/download-zip",
+              "api/contracts/preview"
+            ]
+          },
+          {
+            "group": "Excel",
+            "pages": [
+              "api/excel/upload",
+              "api/excel/download-lawlife",
+              "api/excel/download-sctr",
+              "api/excel/download-photocheck"
+            ]
+          },
+          {
+            "group": "Addendum",
+            "pages": [
+              "api/addendum/upload"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Automated PDF contract generation for multiple contract types (Planilla, Subsidio, Part Time)",
+    "Bulk contract processing with ZIP file downloads",
+    "Excel file upload and data parsing for employee information",
+    "Excel generation for Law Life, SCTR, and photo check integrations",
+    "Addendum document processing and generation",
+    "Contract preview with inline PDF viewing",
+    "Template-based PDF generation using Puppeteer",
+    "Comprehensive data validation with Zod schemas"
+  ],
+  "publicApiSurface": [
+    "POST /api/contracts/download-zip - Generate and download multiple contracts as ZIP",
+    "POST /api/contracts/preview - Preview contract PDF for a single employee",
+    "POST /api/excel/upload - Upload and parse employee data from Excel",
+    "POST /api/excel/download-lawlife - Generate Law Life Excel format",
+    "POST /api/excel/download-sctr - Generate SCTR Excel format",
+    "POST /api/excel/download-photocheck - Generate photo check Excel format",
+    "POST /api/addendum/upload - Process Excel file for addendum generation",
+    "GET /api/health - Health check endpoint"
+  ]
+}
